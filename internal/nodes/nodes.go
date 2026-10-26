@@ -137,8 +137,12 @@ func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := []p.Record{}
+	byID := map[string]p.Record{}
 	for _, row := range rows {
-		if p.Bool(row, "enabled") {
+		byID[p.Text(row, "id")] = row
+	}
+	for _, row := range rows {
+		if nodeVisible(row) && (p.Bool(row, "enabled") || p.Bool(byID[p.Text(row, "parentId")], "enabled")) {
 			delete(row, "agentToken")
 			delete(row, "keyPath")
 			delete(row, "certPath")
@@ -147,6 +151,12 @@ func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 	}
 	p.JSON(w, out)
 }
+
+func nodeVisible(row p.Record) bool {
+	visible, exists := row["visible"]
+	return !exists || visible != false
+}
+
 func (a *app) sync(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		NodeID      string     `json:"nodeId"`

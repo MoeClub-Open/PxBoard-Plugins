@@ -2,7 +2,7 @@
 
 迁移插件将用户、现有访问权益、余额、套餐和订阅转换为 PxBoard 数据。未转换的旧表与原字段保留在迁移快照和归档中，不会作为新业务自动运行。
 
-要求 PxBoard 核心 0.2.0 或更新版本，迁移插件 1.1.1 或更新版本，`access`、`commerce` 1.2.1 或更新版本，其余相关官方插件 1.1.0 或更新版本。插件接口版本为 `1.0`。
+要求 PxBoard 核心 0.3.0 或更新版本，迁移插件 1.2.0 或更新版本，`access`、`commerce`、`nodes` 1.3.0 或更新版本，`subscriptions` 1.2.0 或更新版本。插件接口版本为 `1.0`。
 
 ## 安装与选择来源
 
@@ -29,7 +29,9 @@
 
 节点和机器是可选项。历史订单、支付配置、优惠码、充值卡、审计规则、旧页面设置及其他未转换内容只归档，不会重放扣款、开通权益或自动启用。
 
-SSPanel 商品默认停售并标记为待核对，完整商品内容、原记录和购买限制仍然保留。V2Board / Xboard 的限售、禁用续费等规则尚不能直接执行时，对应套餐也会停售。核对原规则、期限和访问权益后，再编辑套餐并决定是否上架。
+SSPanel 商品默认停售并标记为待核对，完整商品内容、原记录和购买限制仍然保留。V2Board / Xboard 分别保留新购、显示及续费开关；隐藏套餐不会出现在公开目录，原套餐用户可依照原续费开关续费。限售规则尚不能直接执行时，对应套餐停售并标记待核对。核对原规则、期限和访问权益后，再编辑套餐并决定是否上架。
+
+迁移器针对各来源面板的原生数据结构。自建客户端鉴权、OAuth 绑定等外部扩展不会自动转换或启用，其原表仍完整归档；这些扩展应通过各自的目标模块单独接入，并明确核对用户对应关系。
 
 ## 准备数据
 
@@ -123,7 +125,7 @@ Remove-Item Env:PX_MIGRATION_DSN
 | 业务内容 | SSPanel | V2Board / Xboard | PxBoard 处理 |
 | --- | --- | --- | --- |
 | 登录密码 | `pass`，必要时使用源全局算法和盐 | `password`、`password_algo`、`password_salt` | 保留原编码；支持 bcrypt、Argon2i/id、已识别的 MD5 / SHA256 / SHA3 带盐规则；不能识别时阻断 |
-| 动态验证码 | `ga_enable`、`ga_token` | 已识别的 `totp_secret` / `two_factor_secret` 等字段 | 保留密钥；缺少或无法识别有效密钥时阻断，不自动关闭验证 |
+| 动态验证码 | `ga_enable`、`ga_token`，或原生 `mfa_devices` 的 TOTP 设备 | 已识别的 `totp_secret` / `two_factor_secret` 等字段 | 保留密钥；缺少或无法识别有效密钥时阻断，不自动关闭验证；只有不受支持的 FIDO 等设备时阻断 |
 | 连接凭据 | `uuid` 与 `passwd` 分开处理 | `uuid` | 不重置原 UUID；SSPanel 连接密码单独保留 |
 | 账号状态 | `is_banned`、`is_shadow_banned`、旧 `enable` | `banned` 等字段 | 保留停用或暂停语义 |
 | 余额 | `money`，单位元 | `balance`，单位分 | 精确转为整数分，作为迁移期初余额写入一次 |
@@ -156,6 +158,8 @@ V2Board / Xboard 的 `expired_at=null` 表示长期；数值 `0` 表示已到期
 
 套餐期限采用 `durationUnit` 和 `durationValue`：`month` 表示日历月，`day` 表示天，`permanent` 表示长期。月付不会一律转成 30 天。原同套餐的各付费周期通过 `planFamilyId` 关联，便于保持续费后的账户权益。
 
+V2Board / Xboard 的 `sell`（旧版无此字段时使用 `show`）、`show`、`renew` 分别对应 `enabled`、`visible`、`renewable`。原套餐和节点的排序值一并保留，订阅按节点排序输出。未提供续费开关的旧版默认允许续费；停售和隐藏不会阻止原套餐明确允许的续费。
+
 用户表的 `transfer_enable` 是字节；V2Board / Xboard 套餐表对应流量通常为 GB。不要在准备数据时预先统一乘除。适配器按来源分别转换，无法精确表示的金额会阻断，而不是四舍五入后继续。
 
 SSPanel 商品的不同分支开通逻辑可能不同，因此默认停售。商品的 `sourceRecord`、`sourceContent` 和购买限制用于核对；没有定价的 V2Board / Xboard 套餐也会保留为停售记录。停售不撤回已从用户表导入的现有余额、流量和到期权益。
@@ -164,7 +168,13 @@ SSPanel 商品的不同分支开通逻辑可能不同，因此默认停售。商
 
 可选节点转换面向 NodeRS 接入，原记录始终归档。V2Board / Xboard 可读取统一 `v2_server` 表或旧协议分表；存在 Xboard 机器表时保留机器编号和密钥，没有机器记录时按主机生成机器，生成的密钥在同一任务重试中保持稳定。
 
+Xboard 的节点启用与订阅显示分别保存为 `enabled` 和 `visible`。通过 `parent_id` 共用监听服务的节点保留目标 `parentId`：未启用的子节点可以继续作为 IPv6 或中转订阅入口，但不会重复下发给 NodeRS 启动监听。子节点状态使用父节点心跳。隐藏但启用的节点仍运行，只从订阅中隐藏。
+
+AnyTLS 等协议使用对象形式的 `protocol_settings.tls` 时，保留完整 TLS 设置，并提取其中的证书域名；旧 `tls_settings` 结构也会读取。Mieru 取 `transport` 的 TCP/UDP 设置，不把无用的 TLS 或 WebSocket 字段当成实际传输。原证书申请配置随节点保存，已有证书文件和申请缓存仍在节点本机，需要接入前核对。
+
 SSPanel 识别传统 Shadowsocks、SS2022、TUIC、VMess 和 Trojan 的部分常见结构。传统 Shadowsocks 的用户独立端口会转换为独立节点，并限制为相应账户使用。连接密码、UUID 和 SS2022 派生规则分别处理。
+
+SSPanel VMess 依据原 `security` 决定是否启用 TLS；不会对原先未加密的传输强加 TLS。常见 `ws-opts`、`grpc-opts` 等连接参数会转换为对应传输设置。SS2022 没有额外服务器密钥时，仅输出原用户派生密钥。
 
 这不是所有旧节点配置的直接运行迁移。当前转换对传输方式、路由、回落、动态倍率和不认识的接入类型采取保守处理，遇到不能保持语义的配置会阻断。可以取消节点导入，先迁移用户与套餐，再在 PxBoard 配置节点。
 
@@ -185,6 +195,10 @@ https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌?form
 ```
 
 即使令牌未变，旧面板路径仍需要在客户端更新；PxBoard 不模拟旧面板接口。节点接入且用户连接成功后，再完成域名或服务入口切换。保留源站备份和旧服务恢复方式，直到确认切换完成。
+
+Mieru 支持 Mihomo（`format=clash`）和官方 `mierus://` 分享链接（`format=uri`），用户名与密码沿用原 UUID。sing-box 不支持原生 Mieru，因此混合订阅会保留可用节点并跳过 Mieru，响应头 `X-PxBoard-Skipped-Protocols` 会列出跳过的协议；若全部节点均不支持，则返回明确错误，避免生成只能直连的空代理配置。其他尚未支持的协议采用相同规则。
+
+订阅同时保留已识别的 Reality 公钥和短 ID、TLS 域名和验证设置、WS / gRPC / HTTPUpgrade / h2 连接参数，以及 Hysteria 2 混淆和 TUIC 连接选项。XHTTP 支持 Mihomo 与通用链接，sing-box 订阅会跳过该传输。TUIC v4 无法当作 v5 使用，节点导入遇到 v4 会阻断。
 
 ## 快照与归档格式
 

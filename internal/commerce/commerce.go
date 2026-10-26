@@ -15,12 +15,29 @@ type app struct{ *c.App }
 func New() http.Handler {
 	a := &app{c.New()}
 	a.CRUD(planResource(), func(r *http.Request, b, old p.Record) error {
-		c.Defaults(b, old, p.Record{"enabled": true, "durationUnit": "month", "durationValue": 1.0, "timezone": "UTC", "quotaGiB": 100.0, "unlimited": false, "price": 1000.0, "groups": "default", "kind": "subscription", "currency": "CNY"})
+		c.Defaults(b, old, p.Record{"enabled": true, "visible": true, "renewable": true, "durationUnit": "month", "durationValue": 1.0, "timezone": "UTC", "quotaGiB": 100.0, "unlimited": false, "price": 1000.0, "groups": "default", "kind": "subscription", "currency": "CNY"})
+		if p.Text(b, "planFamilyId") == "" {
+			family := p.Text(old, "planFamilyId")
+			if family == "" {
+				family = p.Text(old, "id")
+			}
+			if family == "" {
+				b["id"] = p.ID()
+				family = p.Text(b, "id")
+			}
+			b["planFamilyId"] = family
+		}
 		if e := c.Validate(b, "name", "groups"); e != nil {
 			return e
 		}
 		if p.Number(b, "price") < 0 || math.Trunc(p.Number(b, "price")) != p.Number(b, "price") || p.Number(b, "quotaGiB") < 0 {
 			return fmt.Errorf("价格须为非负整数，流量不能为负数")
+		}
+		if !c.Allowed(p.Text(b, "kind"), "subscription", "time", "traffic", "reset") || p.Text(b, "currency") != "CNY" {
+			return fmt.Errorf("请选择有效的套餐类型，金额币种须为人民币")
+		}
+		if _, e := time.LoadLocation(p.Text(b, "timezone")); e != nil {
+			return fmt.Errorf("套餐时区无效")
 		}
 		if !c.Allowed(p.Text(b, "durationUnit"), "month", "day", "permanent") || p.Text(b, "durationUnit") != "permanent" && (p.Number(b, "durationValue") < 1 || math.Trunc(p.Number(b, "durationValue")) != p.Number(b, "durationValue")) {
 			return fmt.Errorf("请输入有效的套餐期限")
@@ -29,7 +46,13 @@ func New() http.Handler {
 			b["reviewRequired"] = false
 		}
 		return nil
-	}, func(r *http.Request, row p.Record) bool { return p.Admin(r) || p.Bool(row, "enabled") })
+	}, func(r *http.Request, row p.Record) bool {
+		if p.Admin(r) {
+			return true
+		}
+		account, e := a.purchaseAccount(p.Subject(r).ID)
+		return e == nil && planAvailable(row, account)
+	})
 	a.CRUD(couponResource(), func(r *http.Request, b, old p.Record) error {
 		c.Defaults(b, old, p.Record{"enabled": true, "limit": 100.0, "discount": 10.0, "type": "percent"})
 		if e := c.Validate(b, "code"); e != nil {
@@ -37,6 +60,9 @@ func New() http.Handler {
 		}
 		if !c.Allowed(p.Text(b, "type"), "percent", "fixed") || p.Number(b, "discount") < 0 || p.Text(b, "type") == "percent" && p.Number(b, "discount") > 100 {
 			return fmt.Errorf("优惠额度无效")
+		}
+		if p.Text(b, "type") == "fixed" && math.Trunc(p.Number(b, "discount")) != p.Number(b, "discount") || p.Number(b, "limit") < 0 || math.Trunc(p.Number(b, "limit")) != p.Number(b, "limit") {
+			return fmt.Errorf("固定优惠金额须为整数分，可用次数须为非负整数")
 		}
 		return nil
 	})
@@ -114,22 +140,6 @@ func New() http.Handler {
 	a.Events(a.event)
 	return a
 }
-func (a *app) plans(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	rows, e := a.C.List("plans")
-	if c.Err(w, e) {
-		return
-	}
-	out := []p.Record{}
-	for _, row := range rows {
-		if p.Admin(r) || p.Bool(row, "enabled") {
-			out = append(out, row)
-		}
-	}
-	p.JSON(w, out)
-}
 func (a *app) event(e p.Event) error {
 	switch e.Type {
 	case "workspace.configured":
@@ -146,59 +156,9 @@ func (a *app) event(e p.Event) error {
 		if e.Source != "payments" {
 			return fmt.Errorf("支付事件来源无效")
 		}
-		row, err := a.Find("orders", p.Text(e.Data, "orderId"))
-		if err != nil {
-			return err
-		}
-		if p.Text(row, "status") == "fulfilled" || p.Text(row, "status") == "refunded" {
-			return nil
-		}
-		if p.Text(row, "status") != "pending" && p.Text(row, "status") != "paid" {
-			return fmt.Errorf("订单已关闭，请人工核对支付")
-		}
-		if p.Number(row, "amount") != p.Number(e.Data, "amount") || row["currency"] != e.Data["currency"] {
-			return fmt.Errorf("支付金额或币种不符")
-		}
-		row["method"] = "online"
-		row["transactionId"] = e.Data["transactionId"]
-		return a.paid(row)
+		return a.paymentSucceeded(e.Data)
 	case "system.tick":
-		commissions, err := a.C.List("commissions")
-		if err != nil {
-			return err
-		}
-		for _, row := range commissions {
-			if p.Text(row, "status") == "pending" && p.Text(row, "availableAt") <= c.Now() {
-				row["status"] = "available"
-				if err = a.C.Put("commissions", row); err != nil {
-					return err
-				}
-			}
-		}
-		rows, err := a.C.List("orders")
-		if err != nil {
-			return err
-		}
-		for _, row := range rows {
-			switch p.Text(row, "status") {
-			case "paid":
-				if err = a.fulfill(row); err != nil {
-					return err
-				}
-			case "refunding":
-				if err = a.refund(row); err != nil {
-					return err
-				}
-			case "pending":
-				created, _ := time.Parse(time.RFC3339, p.Text(row, "createdAt"))
-				if time.Since(created) > 24*time.Hour {
-					row["status"] = "canceled"
-					if err = a.C.Put("orders", row); err != nil {
-						return err
-					}
-				}
-			}
-		}
+		return a.tick()
 	}
 	return nil
 }

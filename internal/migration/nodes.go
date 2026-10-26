@@ -4,7 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"encoding/json"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"strconv"
 	"strings"
@@ -25,6 +25,9 @@ func (m *mapper) v2Nodes() {
 	nextMachine := int64(0)
 	for _, row := range rows {
 		number := integer(row, "id")
+		if number <= 0 || truth(row, "is_active") && text(row, "token") == "" {
+			m.fail("机器 %s 的编号或接入密钥无效", text(row, "name"))
+		}
 		nextMachine = max(nextMachine, number)
 		m.Machines[text(row, "id")] = true
 		m.doc("nodes", "machines", m.id("machine", text(row, "id")), p.Record{"name": row["name"], "number": number, "key": row["token"], "enabled": truth(row, "is_active"), "createdAt": m.created(row, "created_at"), "source": m.ref(row, table)})
@@ -82,7 +85,31 @@ func (m *mapper) v2Nodes() {
 		if len(tlsSettings) == 0 {
 			tlsSettings = object(settings, "tlsSettings")
 		}
+		if len(tlsSettings) == 0 {
+			tlsSettings = object(settings, "tls")
+		}
+		if value := settings["allow_insecure"]; value != nil && tlsSettings["allow_insecure"] == nil {
+			tlsSettings["allow_insecure"] = truth(settings, "allow_insecure")
+		} else if tlsSettings["allow_insecure"] != nil {
+			tlsSettings["allow_insecure"] = truth(tlsSettings, "allow_insecure")
+		}
 		reality := object(settings, "reality_settings")
+		if len(reality) == 0 {
+			reality = object(settings, "realitySettings")
+		}
+		if tlsMode == 2 {
+			legacy := object(settings, "tls_settings")
+			if len(legacy) == 0 {
+				legacy = object(settings, "tlsSettings")
+			}
+			for key, value := range reality {
+				legacy[key] = value
+			}
+			reality = legacy
+			if reality["allow_insecure"] != nil {
+				reality["allow_insecure"] = truth(reality, "allow_insecure")
+			}
+		}
 		mode := "none"
 		if tlsMode == 1 {
 			mode = "tls"
@@ -90,6 +117,19 @@ func (m *mapper) v2Nodes() {
 			mode = "reality"
 		}
 		transport := text(settings, "network")
+		if protocol == "mieru" {
+			transport = strings.ToLower(text(settings, "transport"))
+			if value := object(settings, "transport"); len(value) > 0 {
+				transport = strings.ToLower(text(value, "type"))
+			}
+			if transport == "" {
+				transport = strings.ToLower(text(settings, "network"))
+			}
+			if transport != "udp" {
+				transport = "tcp"
+			}
+			tlsMode, mode = 0, "none"
+		}
 		if transport == "" {
 			transport = "tcp"
 		}
@@ -100,25 +140,53 @@ func (m *mapper) v2Nodes() {
 		if !supportedProtocol(protocol) {
 			m.fail("节点 %s 使用尚不支持的协议 %s，原始记录已保留", text(row, "name"), protocol)
 		}
+		if protocol == "tuic" && integer(settings, "version") == 4 {
+			m.fail("节点 %s 使用 TUIC v4，不能当作 TUIC v5 无损接入", text(row, "name"))
+		}
 		if !cAllowedTransport(protocol, transport) {
 			m.fail("节点 %s 的传输方式 %s 暂不能由 NodeRS 接入", text(row, "name"), transport)
 		}
 		for _, field := range []string{"routes", "route_ids", "custom_routes", "custom_outbounds", "fallbacks", "fallback", "fallbackForAlpn"} {
-			if value := settings[field]; configured(value) {
+			if configured(settings[field]) || configured(row[field]) {
 				m.fail("节点 %s 含尚不能转换的 %s 规则", text(row, "name"), field)
 			}
+		}
+		if truth(row, "rate_time_enable") {
+			m.fail("节点 %s 使用分时流量倍率，需要先确认倍率规则", text(row, "name"))
 		}
 		enabled := truth(row, "show")
 		if _, ok := row["enabled"]; ok {
 			enabled = truth(row, "enabled")
 		}
-		n := p.Record{"wireId": wireID, "machineId": machine, "name": row["name"], "host": host, "port": portValue, "serverPort": serverPort, "engine": "noders", "protocol": protocol, "tls": tlsMode > 0, "tlsMode": mode, "serverName": first(settings, "server_name", "serverName"), "tlsSettings": tlsSettings, "realitySettings": reality, "certConfig": certificate, "transport": transport, "transportSettings": networkSettings, "protocolOptions": settings, "groups": strings.Join(groups, ","), "trafficRate": number(row, "rate"), "enabled": enabled, "source": m.ref(row, table), "createdAt": m.created(row, "created_at")}
+		serverName := first(settings, "server_name", "serverName")
+		if serverName == nil {
+			serverName = first(tlsSettings, "server_name", "serverName")
+		}
+		if mode == "reality" {
+			serverName = first(reality, "server_name", "serverName")
+		}
+		visible := truth(row, "show")
+		if row["show"] == nil {
+			visible = enabled
+		}
+		n := p.Record{"wireId": wireID, "machineId": machine, "name": row["name"], "host": host, "port": portValue, "serverPort": serverPort, "engine": "noders", "protocol": protocol, "tls": tlsMode > 0, "tlsMode": mode, "serverName": serverName, "tlsSettings": tlsSettings, "realitySettings": reality, "certConfig": certificate, "transport": transport, "transportSettings": networkSettings, "protocolOptions": settings, "groups": strings.Join(groups, ","), "trafficRate": number(row, "rate"), "enabled": enabled, "visible": visible, "source": m.ref(row, table), "createdAt": m.created(row, "created_at")}
+		n["sort"] = integer(row, "sort")
 		if number(row, "rate") == 0 {
 			m.fail("节点 %s 的流量倍率为 0，请在源面板确认", text(row, "name"))
 		}
 		if integer(row, "parent_id") > 0 {
 			n["parentSourceId"] = row["parent_id"]
-			m.warning("节点 %s 的父节点关系已保留，监听前请确认中转端口", text(row, "name"))
+			n["parentId"] = m.id("node", table+":"+text(row, "parent_id"))
+			found := false
+			for _, parent := range m.S.Rows(table) {
+				if text(parent, "id") == text(row, "parent_id") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				m.fail("节点 %s 的父节点不存在", text(row, "name"))
+			}
 		}
 		m.doc("nodes", "nodes", m.id("node", table+":"+text(row, "id")), n)
 	}
@@ -134,93 +202,6 @@ func (m *mapper) v2Nodes() {
 			m.NodeCounter++
 			mapNode(row, table, protocol, m.NodeCounter)
 		}
-	}
-}
-func (m *mapper) ssNodes() {
-	m.warning("节点记录已转换；服务器证书、私钥文件和外部服务不在迁移快照中，请在接入 NodeRS 前核对证书与监听设置。")
-	table, rows := m.table("node", "ss_node")
-	machineByHost := map[string]int64{}
-	machineCounter := int64(0)
-	for _, row := range rows {
-		host := text(row, "server")
-		machine := machineByHost[host]
-		if machine == 0 {
-			machineCounter++
-			machine = machineCounter
-			machineByHost[host] = machine
-			key := text(row, "password")
-			if key == "" {
-				key = m.newKey("machine:" + host)
-			}
-			m.doc("nodes", "machines", m.id("machine", strconv.FormatInt(machine, 10)), p.Record{"number": machine, "name": host, "key": key, "enabled": true, "source": m.ref(row, table), "createdAt": m.S.ExportedAt})
-		}
-		custom := object(row, "custom_config")
-		sortValue := integer(row, "sort")
-		protocol := map[int64]string{0: "shadowsocks", 1: "shadowsocks", 2: "tuic", 11: "vmess", 14: "trojan"}[sortValue]
-		if protocol == "" {
-			m.fail("SSPanel 节点 %s 的接入类型 %d 尚未支持，原始记录已保留", text(row, "name"), sortValue)
-			continue
-		}
-		if truth(row, "is_dynamic_rate") {
-			m.fail("节点 %s 使用动态倍率，需要先实现或确认倍率规则，不能静默改成固定倍率", text(row, "name"))
-		}
-		port := integer(custom, "offset_port_user")
-		if port == 0 {
-			port = integer(custom, "offset_port_node")
-		}
-		if port == 0 {
-			port = 443
-		}
-		serverPort := integer(custom, "offset_port_node")
-		if serverPort == 0 {
-			serverPort = port
-		}
-		transport := text(custom, "network")
-		if transport == "" {
-			transport = "tcp"
-		}
-		base := p.Record{"name": row["name"], "host": host, "port": port, "serverPort": serverPort, "machineId": machine, "engine": "noders", "protocol": protocol, "tls": sortValue != 0 && sortValue != 1, "tlsMode": "tls", "serverName": custom["host"], "transport": transport, "protocolOptions": custom, "transportSettings": p.Record{"path": custom["path"], "serviceName": custom["servicename"]}, "certConfig": custom["cert_config"], "groups": m.group(text(row, "node_group")), "minimumAccessLevel": integer(row, "node_class"), "trafficRate": number(row, "traffic_rate"), "enabled": truth(row, "type"), "source": m.ref(row, table), "createdAt": m.S.ExportedAt}
-		if !cAllowedTransport(protocol, transport) {
-			m.fail("节点 %s 的传输方式 %s 暂不能由 NodeRS 接入", text(row, "name"), transport)
-		}
-		if sortValue == 0 {
-			for _, user := range m.S.Rows("user") {
-				m.NodeCounter++
-				copy := p.Record{}
-				for k, v := range base {
-					copy[k] = v
-				}
-				copy["wireId"] = m.NodeCounter
-				copy["name"] = fmt.Sprintf("%s · %s", text(row, "name"), text(user, "email"))
-				copy["port"] = integer(user, "port")
-				copy["serverPort"] = integer(user, "port")
-				copy["allowedAccountIds"] = []int64{integer(user, "id")}
-				copy["protocolOptions"] = p.Record{"cipher": user["method"]}
-				copy["tlsMode"] = "none"
-				copy["passwordMode"] = "proxy"
-				m.doc("nodes", "nodes", m.id("node", text(row, "id")+":user:"+text(user, "id")), copy)
-			}
-			continue
-		}
-		if sortValue == 1 {
-			method := text(custom, "method")
-			if method == "" {
-				method = "2022-blake3-aes-128-gcm"
-			}
-			custom["cipher"] = method
-			custom["serverKey"] = custom["server_key"]
-			base["passwordMode"] = "sha3-hex-prefix-base64"
-			if !strings.Contains(method, "aes-128") && !strings.Contains(method, "aes-256") {
-				m.fail("SS2022 节点 %s 的算法 %s 不适用于 NodeRS 多用户模式", text(row, "name"), method)
-			}
-		} else if protocol == "trojan" {
-			base["passwordMode"] = "uuid"
-		} else {
-			base["passwordMode"] = "proxy"
-		}
-		m.NodeCounter++
-		base["wireId"] = m.NodeCounter
-		m.doc("nodes", "nodes", m.id("node", text(row, "id")), base)
 	}
 }
 func first(row Row, keys ...string) any {
@@ -243,6 +224,13 @@ func supportedProtocol(protocol string) bool {
 }
 
 func cAllowedTransport(protocol, transport string) bool {
+	if protocol == "vless" || protocol == "vmess" || protocol == "trojan" {
+		switch transport {
+		case "", "tcp", "raw", "ws", "websocket", "httpupgrade", "grpc", "h2", "http", "xhttp", "splithttp":
+			return true
+		}
+		return false
+	}
 	if protocol == "hysteria2" || protocol == "tuic" {
 		return transport == "tcp" || transport == "udp" || transport == "quic" || transport == ""
 	}
@@ -262,7 +250,17 @@ func configured(value any) bool {
 	case Row:
 		return len(v) > 0
 	case string:
-		return v != "" && v != "[]" && v != "null" && v != "0"
+		return v != "" && v != "[]" && v != "null" && v != "0" && v != "false"
+	case bool:
+		return v
+	case json.Number:
+		return v != "0"
+	case float64:
+		return v != 0
+	case int:
+		return v != 0
+	case int64:
+		return v != 0
 	default:
 		return true
 	}

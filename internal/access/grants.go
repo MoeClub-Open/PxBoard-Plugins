@@ -38,7 +38,11 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if row == nil {
-		row = p.Record{"id": p.ID(), "userId": b["userId"], "credential": uuid(), "cycleStart": c.Now(), "grants": map[string]any{}}
+		if c.Allowed(p.Text(b, "kind"), "traffic", "reset", "time") {
+			p.Fail(w, 400, "请先开通基础套餐")
+			return
+		}
+		row = p.Record{"id": p.ID(), "userId": b["userId"], "numericId": nextNumericID(rows), "credential": uuid(), "cycleStart": cycleNow(), "grants": map[string]any{}}
 	}
 	grants, _ := row["grants"].(map[string]any)
 	if grants == nil {
@@ -48,7 +52,12 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		p.JSON(w, row)
 		return
 	}
-	previous := p.Record{"createdAt": c.Now(), "kind": b["kind"]}
+	sequence := 0.0
+	for _, raw := range grants {
+		grant, _ := raw.(map[string]any)
+		sequence = max(sequence, p.Number(grant, "sequence"))
+	}
+	previous := p.Record{"createdAt": c.Now(), "kind": b["kind"], "sequence": sequence + 1}
 	for _, key := range entitlementFields {
 		previous[key] = row[key]
 	}
@@ -56,7 +65,7 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 	case "traffic":
 		row["quotaGiB"] = p.Number(row, "quotaGiB") + p.Number(b, "quotaGiB")
 	case "reset":
-		row["cycleStart"] = c.Now()
+		row["cycleStart"] = cycleNow()
 	default:
 		base := time.Now()
 		if expires, e := time.Parse(time.RFC3339, p.Text(row, "expiresAt")); e == nil && expires.After(base) {
@@ -84,7 +93,7 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		}
 		if p.Text(b, "kind") != "time" {
 			if p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") || p.Text(b, "planFamilyId") == "" {
-				row["cycleStart"] = c.Now()
+				row["cycleStart"] = cycleNow()
 			}
 			for _, key := range []string{"quotaGiB", "unlimited", "groups", "accessLevel", "speedLimitMbps", "deviceLimit", "planFamilyId"} {
 				if b[key] != nil {
@@ -93,12 +102,18 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 			}
 			row["cycleDays"] = 30.0
 			if policy, ok := b["resetPolicy"].(map[string]any); ok {
+				if p.Text(policy, "timezone") == "" {
+					policy["timezone"] = zoneName
+				}
+				policyZone, err := time.LoadLocation(p.Text(policy, "timezone"))
+				if c.Err(w, err) {
+					return
+				}
 				row["cycleDays"] = 0
 				delete(policy, "nextAt")
 				if strings.HasSuffix(p.Text(policy, "type"), "Anniversary") {
 					if expires, e := time.Parse(time.RFC3339, p.Text(row, "expiresAt")); e == nil {
-						zone, _ := time.LoadLocation(p.Text(policy, "timezone"))
-						expires = expires.In(zone)
+						expires = expires.In(policyZone)
 						policy["day"] = expires.Day()
 						policy["month"] = int(expires.Month())
 						if p.Bool(policy, "anchorTime") {
@@ -150,7 +165,7 @@ func (a *app) revoke(w http.ResponseWriter, r *http.Request) {
 		latest := true
 		for _, g := range grants {
 			v, _ := g.(map[string]any)
-			if v != nil && v["revoked"] != true && p.Text(v, "createdAt") > p.Text(grant, "createdAt") {
+			if v != nil && v["revoked"] != true && (p.Number(v, "sequence") > p.Number(grant, "sequence") || p.Number(v, "sequence") == p.Number(grant, "sequence") && p.Text(v, "createdAt") > p.Text(grant, "createdAt")) {
 				latest = false
 			}
 		}

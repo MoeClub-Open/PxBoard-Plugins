@@ -72,21 +72,27 @@ func (a *app) redeem(w http.ResponseWriter, r *http.Request) {
 		if row["code"] != b["code"] {
 			continue
 		}
-		if p.Text(row, "status") != "unused" && row["userId"] != p.Subject(r).ID || p.Text(row, "expiresAt") != "" && p.Text(row, "expiresAt") < c.Now() {
+		if p.Text(row, "status") != "unused" && row["userId"] != p.Subject(r).ID || p.Text(row, "status") == "unused" && p.Text(row, "expiresAt") != "" && p.Text(row, "expiresAt") < c.Now() {
 			p.Fail(w, 400, "充值卡已使用或已到期")
 			return
 		}
 		row["status"] = "used"
 		row["userId"] = p.Subject(r).ID
+		if p.Text(row, "usedAt") == "" {
+			row["usedAt"] = c.Now()
+		}
 		if c.Err(w, a.C.Put("gifts", row)) {
 			return
 		}
-		if !c.Err(w, a.C.Put("ledger", p.Record{"id": "gift-" + p.Text(row, "id"), "userId": p.Subject(r).ID, "amount": row["amount"], "reason": "充值卡兑换", "createdAt": c.Now()})) {
+		if !c.Err(w, a.creditGift(row)) {
 			p.JSON(w, true)
 		}
 		return
 	}
 	p.Fail(w, 400, "充值卡不存在")
+}
+func (a *app) creditGift(row p.Record) error {
+	return a.C.Put("ledger", p.Record{"id": "gift-" + p.Text(row, "id"), "userId": row["userId"], "amount": row["amount"], "reason": "充值卡兑换", "createdAt": row["usedAt"]})
 }
 func (a *app) register(w http.ResponseWriter, r *http.Request) {
 	config, e := a.config()

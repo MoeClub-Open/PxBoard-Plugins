@@ -214,6 +214,14 @@ func (a *app) withdrawAction(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.PathValue("action") {
 	case "approve":
+		available, err := a.available(p.Text(row, "userId"))
+		if c.Err(w, err) {
+			return
+		}
+		if p.Text(row, "status") == "pending" && available < 0 {
+			p.Fail(w, 409, "可结算佣金因退款等变动已不足，请先核对或拒绝申请")
+			return
+		}
 		if p.Text(row, "method") == "cash" {
 			row["status"] = "approved"
 			row["actor"] = p.Subject(r).Email

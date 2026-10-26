@@ -1,6 +1,6 @@
 {
   "author": "PxBoard",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "homepage": "",
   "events": [
     "payment.succeeded",
@@ -8,7 +8,7 @@
     "workspace.configured"
   ],
   "dependencies": {
-    "access": ">=1.2.1"
+    "access": ">=1.3.0"
   },
   "id": "commerce",
   "publicPaths": [
@@ -81,7 +81,8 @@
     "users:create",
     "call:access",
     "call:payments",
-    "emit:order.fulfilled"
+    "emit:order.fulfilled",
+    "emit:payment.review-required"
   ],
   "apiVersion": "1.0",
   "description": "套餐、续费、流量加油包、订单、余额、优惠码、充值卡和推广返佣",
@@ -128,5 +129,6 @@
         "business"
       ]
     }
-  ]
+  ],
+  "minCoreVersion": "0.3.0"
 }

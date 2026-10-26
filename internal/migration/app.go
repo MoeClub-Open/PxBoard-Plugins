@@ -185,7 +185,11 @@ func (a *app) prepare(job p.Record) error {
 	}
 	job["sourceRows"] = plan.SourceRows
 	job["archiveRows"] = plan.ArchiveRows
-	job["mappedRows"] = len(plan.Rows) - plan.ArchiveRows
+	mapped := 0
+	for _, count := range plan.Mapped {
+		mapped += count
+	}
+	job["mappedRows"] = mapped
 	job["warningCount"] = len(plan.Warnings)
 	job["errorCount"] = len(plan.Errors)
 	job["report"] = reportText(plan)

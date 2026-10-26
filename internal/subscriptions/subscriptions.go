@@ -7,7 +7,10 @@ import (
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
+	"time"
 )
 
 type app struct{ *c.App }
@@ -21,108 +24,19 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /s/{token}", a.export)
 	return a
 }
-func (a *app) create(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	user := p.Subject(r).ID
-	if p.Admin(r) {
-		var b p.Record
-		if c.Err(w, p.Decode(r, &b)) {
-			return
-		}
-		if p.Text(b, "userId") != "" {
-			user = p.Text(b, "userId")
-		}
-	}
-	var clients []p.Record
-	if c.Err(w, a.C.Call("access", "GET", "/internal/clients", nil, &clients)) {
-		return
-	}
-	found := false
-	for _, v := range clients {
-		if v["userId"] == user {
-			found = true
-		}
-	}
-	if !found {
-		p.Fail(w, 400, "用户还没有可用访问账户")
-		return
-	}
-	rows, e := a.C.List("links")
-	if c.Err(w, e) {
-		return
-	}
-	for _, row := range rows {
-		if row["userId"] == user {
-			p.Fail(w, 409, "此用户已经有订阅链接")
-			return
-		}
-	}
-	b := p.Record{"userId": user, "token": p.ID() + p.ID(), "createdAt": c.Now()}
-	if !c.Err(w, a.C.Put("links", b)) {
-		p.JSON(w, b)
-	}
-}
-func (a *app) links(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	rows, e := a.Filter("links", func(row p.Record) bool { return c.Own(r, row) })
-	if c.Err(w, e) {
-		return
-	}
-	users, e := a.C.Users()
-	if c.Err(w, e) {
-		return
-	}
-	for _, row := range rows {
-		for _, u := range users {
-			if row["userId"] == u["id"] {
-				row["email"] = u["email"]
-			}
-		}
-		base := "/api/v1/extensions/subscriptions/s/" + p.Text(row, "token")
-		row["clashUrl"] = base + "?format=clash"
-		row["singboxUrl"] = base + "?format=sing-box"
-		row["shareUrl"] = base + "?format=uri"
-	}
-	p.JSON(w, rows)
-}
-func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	row, e := a.Find("links", r.PathValue("id"))
-	if c.Err(w, e) {
-		return
-	}
-	if !c.Own(r, row) {
-		p.Fail(w, 403, "无权修改此链接")
-		return
-	}
-	row["token"] = p.ID() + p.ID()
-	if !c.Err(w, a.C.Put("links", row)) {
-		p.JSON(w, true)
-	}
-}
 func (a *app) export(w http.ResponseWriter, r *http.Request) {
-	rows, e := a.C.List("links")
+	w.Header().Set("Cache-Control", "no-store")
+	rows, e := a.queryLinks([]p.Record{{"field": "token", "value": r.PathValue("token")}})
 	if c.Err(w, e) {
 		return
 	}
-	var link p.Record
-	for _, v := range rows {
-		if v["token"] == r.PathValue("token") {
-			link = v
-		}
-	}
-	if link == nil {
+	if len(rows) == 0 {
 		p.Fail(w, 404, "订阅链接不存在或已重置")
 		return
 	}
+	link := rows[0]
 	var clients, nodes []p.Record
-	if c.Err(w, a.C.Call("access", "GET", "/internal/clients", nil, &clients)) {
+	if c.Err(w, a.C.Call("access", "GET", "/internal/clients?userId="+url.QueryEscape(p.Text(link, "userId")), nil, &clients)) {
 		return
 	}
 	var account p.Record
@@ -144,13 +58,16 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 			allowed = append(allowed, n)
 		}
 	}
-	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("profile-update-interval", "6")
-	w.Header().Set("Subscription-Userinfo", fmt.Sprintf("upload=0; download=%.0f; total=%.0f", p.Number(account, "usedGiB")*1073741824, p.Number(account, "quotaGiB")*1073741824))
+	info := fmt.Sprintf("upload=0; download=%.0f; total=%.0f", p.Number(account, "usedGiB")*1073741824, p.Number(account, "quotaGiB")*1073741824)
+	if expires, e := time.Parse(time.RFC3339, p.Text(account, "expiresAt")); e == nil {
+		info += fmt.Sprintf("; expire=%d", expires.Unix())
+	}
+	w.Header().Set("Subscription-Userinfo", info)
 	format := r.URL.Query().Get("format")
 	if format == "" {
 		ua := strings.ToLower(r.UserAgent())
-		if strings.Contains(ua, "clash") {
+		if strings.Contains(ua, "clash") || strings.Contains(ua, "mihomo") {
 			format = "clash"
 		} else if strings.Contains(ua, "sing-box") {
 			format = "sing-box"
@@ -158,12 +75,37 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 			format = "uri"
 		}
 	}
+	if !c.Allowed(format, "clash", "sing-box", "uri") {
+		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
+		return
+	}
+	compatible := []p.Record{}
+	skipped := map[string]bool{}
 	for _, n := range allowed {
-		if !c.Allowed(p.Text(n, "protocol"), "vless", "vmess", "trojan", "shadowsocks", "hysteria2", "anytls", "tuic") {
-			p.Fail(w, 400, "当前订阅格式尚未支持节点协议："+p.Text(n, "protocol"))
+		protocol := p.Text(n, "protocol")
+		if supportedFormat(n, format) {
+			compatible = append(compatible, n)
+		} else {
+			skipped[protocol] = true
+		}
+	}
+	if len(skipped) > 0 {
+		protocols := []string{}
+		for protocol := range skipped {
+			protocols = append(protocols, protocol)
+		}
+		sort.Strings(protocols)
+		w.Header().Set("X-PxBoard-Skipped-Protocols", strings.Join(protocols, ","))
+		if len(compatible) == 0 {
+			message := "当前格式没有可用节点（协议或传输不支持：" + strings.Join(protocols, "、") + "）"
+			if skipped["mieru"] {
+				message += "；Mieru 请使用 Mihomo 订阅或支持 mierus 链接的客户端"
+			}
+			p.Fail(w, 400, message)
 			return
 		}
 	}
+	allowed = sortedNodes(compatible)
 	uuid := p.Text(account, "credential")
 	switch format {
 	case "clash":
@@ -198,8 +140,6 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n")))))
-	default:
-		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
 	}
 }
 func rawJSON(w http.ResponseWriter, v any) {
@@ -211,5 +151,5 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	if p.Admin(r) {
 		res.Fields = []p.Field{c.UserField(a.C)}
 	}
-	return p.View{Title: "订阅与客户端", Resources: []p.Resource{res}}, nil
+	return p.View{Title: "订阅与客户端", Notice: "Mieru 节点请使用 Mihomo；sing-box 订阅仅包含其支持的节点。", Resources: []p.Resource{res}}, nil
 }

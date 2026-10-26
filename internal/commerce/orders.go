@@ -1,7 +1,6 @@
 package commerce
 
 import (
-	"fmt"
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"math"
@@ -72,8 +71,16 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		if c.Err(w, e) {
 			return
 		}
-		if !p.Bool(plan, "enabled") {
-			p.Fail(w, 400, "此套餐已停售")
+		account, e := a.purchaseAccount(user)
+		if c.Err(w, e) {
+			return
+		}
+		if !planAvailable(plan, account) {
+			p.Fail(w, 400, "此套餐暂不可购买或续费")
+			return
+		}
+		if account == nil && c.Allowed(p.Text(plan, "kind"), "traffic", "reset", "time") {
+			p.Fail(w, 400, "请先购买基础套餐，再使用补充套餐")
 			return
 		}
 		row["planId"] = plan["id"]
@@ -152,6 +159,14 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 			p.Fail(w, 400, "只能取消待支付订单")
 			return
 		}
+		debited, err := a.walletDebited(row)
+		if c.Err(w, err) {
+			return
+		}
+		if debited {
+			p.Fail(w, 409, "余额已扣款，订单正在开通，不能取消")
+			return
+		}
 		row["status"] = "canceled"
 		e = a.C.Put("orders", row)
 	case "pay":
@@ -193,7 +208,9 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		row["method"] = "wallet"
+		if p.Text(row, "status") == "pending" {
+			row["method"] = "wallet"
+		}
 		e = a.paid(row)
 	case "confirm":
 		if !c.Require(w, r) {
@@ -203,11 +220,25 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 			p.Fail(w, 400, "只能确认待支付订单")
 			return
 		}
-		row["method"] = "manual"
-		row["confirmedBy"] = p.Subject(r).Email
+		if p.Text(row, "status") == "pending" {
+			debited, err := a.walletDebited(row)
+			if c.Err(w, err) {
+				return
+			}
+			if debited {
+				p.Fail(w, 409, "余额已扣款，订单正在开通，无需重复确认收款")
+				return
+			}
+			row["method"] = "manual"
+			row["confirmedBy"] = p.Subject(r).Email
+		}
 		e = a.paid(row)
 	case "refund":
 		if !c.Require(w, r) {
+			return
+		}
+		if p.Text(row, "kind") == "recharge" {
+			p.Fail(w, 400, "充值订单请通过原支付渠道退款，随后调整账本")
 			return
 		}
 		if p.Text(row, "status") != "fulfilled" && p.Text(row, "status") != "refunding" {
@@ -226,77 +257,4 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 	if !c.Err(w, e) {
 		p.JSON(w, row)
 	}
-}
-func (a *app) paid(row p.Record) error {
-	row["status"] = "paid"
-	if row["paidAt"] == nil {
-		row["paidAt"] = c.Now()
-	}
-	if e := a.C.Put("orders", row); e != nil {
-		return e
-	}
-	return a.fulfill(row)
-}
-func (a *app) fulfill(row p.Record) error {
-	if p.Text(row, "kind") == "recharge" {
-		if e := a.C.Put("ledger", p.Record{"id": "recharge-" + p.Text(row, "id"), "userId": row["userId"], "amount": row["amount"], "reason": "余额充值", "orderId": row["id"], "createdAt": c.Now()}); e != nil {
-			return e
-		}
-	} else {
-		plan, _ := row["plan"].(map[string]any)
-		if plan == nil {
-			return fmt.Errorf("套餐快照不存在")
-		}
-		grant := p.Record{"grantId": row["id"], "userId": row["userId"]}
-		for _, key := range []string{"quotaGiB", "unlimited", "durationUnit", "durationValue", "timezone", "groups", "kind", "accessLevel", "speedLimitMbps", "deviceLimit", "resetPolicy", "planFamilyId"} {
-			if plan[key] != nil {
-				grant[key] = plan[key]
-			}
-		}
-		if e := a.C.Call("access", "POST", "/internal/grant", grant, nil); e != nil {
-			return e
-		}
-		if e := a.commission(row); e != nil {
-			return e
-		}
-	}
-	row["status"] = "fulfilled"
-	row["fulfilledAt"] = c.Now()
-	if e := a.C.Put("orders", row); e != nil {
-		return e
-	}
-	return a.C.Emit("order.fulfilled", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"]})
-}
-func (a *app) refund(row p.Record) error {
-	if p.Text(row, "kind") == "recharge" {
-		balance, e := a.balance(p.Text(row, "userId"))
-		if e != nil {
-			return e
-		}
-		if balance < p.Number(row, "amount") {
-			return fmt.Errorf("充值余额已使用，无法退回")
-		}
-		row["status"] = "fulfilled"
-		return fmt.Errorf("充值订单请通过原支付渠道退款，随后调整账本")
-	}
-	if e := a.C.Call("access", "POST", "/internal/revoke", p.Record{"grantId": row["id"], "userId": row["userId"]}, nil); e != nil {
-		return e
-	}
-	if e := a.C.Put("ledger", p.Record{"id": "refund-" + p.Text(row, "id"), "userId": row["userId"], "amount": row["amount"], "reason": "订单退回余额", "orderId": row["id"], "createdAt": c.Now()}); e != nil {
-		return e
-	}
-	commissions, e := a.C.List("commissions")
-	if e != nil {
-		return e
-	}
-	for _, v := range commissions {
-		if v["orderId"] == row["id"] {
-			v["status"] = "reversed"
-			if e = a.C.Put("commissions", v); e != nil {
-				return e
-			}
-		}
-	}
-	row["status"] = "refunded"
-	return a.C.Put("orders", row)
 }

@@ -1,15 +1,15 @@
 {
   "id": "import-sspanel",
   "name": "从 SSPanel 导入",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "apiVersion": "1.0",
   "description": "保留原密码、连接凭据、余额、流量和套餐信息，支持导入预览与冲突检查",
   "category": "迁移",
   "author": "PxBoard",
   "dependencies": {
-    "subscriptions": ">=1.1.0",
-    "commerce": ">=1.2.1",
-    "access": ">=1.2.1"
+    "subscriptions": ">=1.2.0",
+    "commerce": ">=1.3.0",
+    "access": ">=1.3.0"
   },
   "permissions": [
     "storage:own",
@@ -30,5 +30,6 @@
       "title": "SSPanel 导入",
       "id": "migration"
     }
-  ]
+  ],
+  "minCoreVersion": "0.3.0"
 }

@@ -42,6 +42,9 @@ func (m *mapper) v2Plans() {
 			}
 			plan := p.Record{"name": text(row, "name") + " · " + definition.label, "price": m.money(Row{"price": value}, "price", yuan), "durationUnit": "month", "durationValue": definition.months, "quotaGiB": number(row, "transfer_enable"), "groups": group, "kind": definition.kind, "currency": "CNY", "enabled": enabled, "renew": row["renew"], "capacityLimit": integer(row, "capacity_limit"), "speedLimitMbps": integer(row, "speed_limit"), "deviceLimit": integer(row, "device_limit"), "source": m.ref(row, table), "sourcePeriod": period, "createdAt": m.created(row, "created_at")}
 			plan["unlimited"] = false
+			plan["visible"] = row["show"] == nil || truth(row, "show")
+			plan["renewable"] = row["renew"] == nil || truth(row, "renew")
+			plan["sort"] = integer(row, "sort")
 			plan["timezone"] = m.S.Timezone
 			plan["planFamilyId"] = m.id("plan-family", text(row, "id"))
 			plan["sourceContent"] = row
@@ -54,10 +57,10 @@ func (m *mapper) v2Plans() {
 			} else {
 				plan["resetPolicy"] = m.resetPolicy(row, Row{})
 			}
-			if integer(row, "capacity_limit") > 0 || row["renew"] != nil && !truth(row, "renew") {
+			if integer(row, "capacity_limit") > 0 {
 				plan["enabled"] = false
 				plan["reviewRequired"] = true
-				m.warning("套餐 %s 的限售/续费规则已保留，核对后再开售", p.Text(plan, "name"))
+				m.warning("套餐 %s 的限售规则已保留，核对后再开售", p.Text(plan, "name"))
 			}
 			m.doc("commerce", "plans", id, plan)
 			converted++

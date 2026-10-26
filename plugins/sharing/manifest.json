@@ -12,9 +12,9 @@
   ],
   "author": "PxBoard",
   "category": "分享",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "dependencies": {
-    "access": ">=1.1.0"
+    "access": ">=1.3.0"
   },
   "homepage": "",
   "description": "邀请注册、分享时限和独立流量额度",
@@ -25,6 +25,15 @@
       "icon": "gift",
       "roles": [
         "admin"
+      ],
+      "group": "连接"
+    },
+    {
+      "title": "领取分享",
+      "id": "claim",
+      "icon": "gift",
+      "roles": [
+        "member"
       ],
       "group": "连接"
     }
@@ -66,5 +75,9 @@
         "sharing"
       ]
     }
-  ]
+  ],
+  "events": [
+    "system.tick"
+  ],
+  "minCoreVersion": "0.3.0"
 }

@@ -4,6 +4,9 @@
     "/webhooks"
   ],
   "apiVersion": "1.0",
+  "events": [
+    "payment.review-required"
+  ],
   "name": "支付网关",
   "permissions": [
     "storage:own",
@@ -12,9 +15,9 @@
   ],
   "author": "PxBoard",
   "category": "商业",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "dependencies": {
-    "commerce": ">=1.0.0"
+    "commerce": ">=1.3.0"
   },
   "homepage": "",
   "description": "Stripe 与易支付收银台、回调签名校验和支付流水",
@@ -28,5 +31,6 @@
       ],
       "group": "运营"
     }
-  ]
+  ],
+  "minCoreVersion": "0.3.0"
 }

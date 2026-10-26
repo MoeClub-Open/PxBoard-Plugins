@@ -63,8 +63,8 @@ func (m *mapper) user(row Row, table, loginHash string, account p.Record, balanc
 		name = email
 	}
 	created := m.created(row, "created_at", "reg_date")
-	secret := ""
-	if truth(row, "ga_enable") {
+	secret := m.MFA[id]
+	if secret == "" && truth(row, "ga_enable") {
 		secret = text(row, "ga_token")
 		if secret == "" {
 			m.fail("用户 %s 开启了动态验证码但缺少密钥", email)
@@ -159,6 +159,7 @@ func (m *mapper) ssUsers() {
 	for _, row := range rows {
 		m.Users[text(row, "id")] = true
 	}
+	m.ssMFA()
 	for _, row := range rows {
 		group := m.group("0")
 		if value := text(row, "node_group"); value != "" && value != "0" {

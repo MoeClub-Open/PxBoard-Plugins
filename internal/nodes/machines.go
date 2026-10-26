@@ -20,7 +20,27 @@ func (a *app) machinesView(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
 		return p.View{}, fmt.Errorf("仅管理员可管理机器")
 	}
-	return p.View{Title: "机器", Resources: []p.Resource{{Key: "machines", Title: "机器", Endpoint: "/machines", CreateLabel: "添加机器", Editable: true, Deletable: true, Columns: []p.Field{c.Field("number", "机器编号", "number", false), c.Field("name", "名称", "text", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("enabled", "启用", "boolean", false)}, Fields: []p.Field{c.Field("name", "名称", "text", true), {Key: "enabled", Label: "启用", Type: "boolean", Default: true}}, Actions: []p.Action{{Key: "credentials", Label: "接入凭据"}, {Key: "rotate", Label: "轮换密钥", Confirm: "轮换后原机器密钥立即失效，需要更新 NodeRS 配置。"}}}}}, nil
+	machines := p.Resource{
+		Key: "machines", Title: "机器", Endpoint: "/machines", CreateLabel: "添加机器", Editable: true, Deletable: true,
+		Columns: []p.Field{c.Field("number", "机器编号", "number", false), c.Field("name", "名称", "text", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("enabled", "启用", "boolean", false)},
+		Fields:  []p.Field{c.Field("name", "名称", "text", true), {Key: "enabled", Label: "启用", Type: "boolean", Default: true}},
+		Actions: []p.Action{
+			{Key: "credentials", Label: "接入凭据"},
+			{Key: "configuration", Label: "迁移面板", Fields: []p.Field{
+				{Key: "panelType", Label: "目标面板", Type: "select", Required: true, Default: "pxboard", Options: []p.Option{{Label: "PxBoard", Value: "pxboard"}, {Label: "Xboard", Value: "xboard"}}},
+				c.Field("api", "目标面板地址", "url", true),
+				c.Field("machineId", "目标机器编号", "number", true),
+				c.Field("key", "目标机器密钥", "password", true),
+			}},
+			{Key: "rotate", Label: "轮换密钥", Confirm: "轮换后原机器密钥立即失效，需要更新 NodeRS 配置。"},
+		},
+	}
+	configurations := p.Resource{
+		Key: "machineConfigurations", Title: "配置变更", Endpoint: "/machine-configurations", PollIntervalSeconds: 10,
+		Columns: []p.Field{c.Field("machineName", "原机器", "text", false), c.Field("revision", "配置版本", "number", false), c.Field("api", "目标面板", "text", false), c.Field("machineId", "目标机器编号", "number", false), c.Field("statusLabel", "状态", "text", false), c.Field("message", "处理结果", "text", false), c.Field("updatedAt", "更新时间", "datetime", false)},
+		Actions: []p.Action{{Key: "retry", Label: "重新下发", When: map[string][]string{"status": {"failed"}}}},
+	}
+	return p.View{Title: "机器", Resources: []p.Resource{machines, configurations}}, nil
 }
 func (a *app) machineCredentials(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {
@@ -28,6 +48,10 @@ func (a *app) machineCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	row, e := a.Find("machines", r.PathValue("id"))
 	if c.Err(w, e) {
+		return
+	}
+	if r.PathValue("action") == "configuration" {
+		a.configureMachine(w, r, row)
 		return
 	}
 	if r.PathValue("action") == "rotate" {
@@ -98,9 +122,10 @@ func (a *app) machineAPI() {
 	base := "/machines/{machine}"
 	a.Mux.HandleFunc("GET "+base+"/handshake", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := a.machine(w, r); ok {
-			p.JSON(w, p.Record{"apiVersion": "1.0", "transport": "poll", "capabilities": []string{"multiNode", "trafficOutbox", "onlineAccounts"}})
+			p.JSON(w, p.Record{"apiVersion": "1.0", "transport": "poll", "capabilities": []string{"multiNode", "trafficOutbox", "onlineAccounts", "managedConfiguration"}})
 		}
 	})
+	a.configurationAPI(base)
 	a.Mux.HandleFunc("GET "+base+"/nodes", a.machineNodes)
 	a.Mux.HandleFunc("GET "+base+"/nodes/{node}/config", a.machineConfig)
 	a.Mux.HandleFunc("GET "+base+"/nodes/{node}/users", a.machineUsers)

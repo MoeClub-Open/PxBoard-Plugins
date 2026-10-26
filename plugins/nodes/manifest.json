@@ -15,12 +15,12 @@
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "dependencies": {
     "access": ">=1.1.0"
   },
   "homepage": "",
-  "description": "NodeRS 原生接入、节点配置、流量回报与状态监控",
+  "description": "NodeRS 原生接入、节点配置、面板迁移、流量回报与状态监控",
   "pages": [
     {
       "title": "节点管理",
@@ -51,5 +51,6 @@
       "title": "节点状态"
     }
   ],
-  "summary": true
+  "summary": true,
+  "minCoreVersion": "0.3.0"
 }

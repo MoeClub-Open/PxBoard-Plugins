@@ -25,82 +25,17 @@ func New() http.Handler {
 	})
 	a.View("sharing", a.view)
 	a.Mux.HandleFunc("POST /redeem", a.redeem)
-	a.Mux.HandleFunc("POST /invites/{id}/claim", a.claim)
+	a.Mux.HandleFunc("POST /claim", a.claim)
+	a.Mux.HandleFunc("GET /claim", func(w http.ResponseWriter, r *http.Request) {
+		if c.Member(w, r) {
+			p.JSON(w, []p.Record{})
+		}
+	})
+	a.View("claim", func(r *http.Request) (p.View, error) {
+		return p.View{Title: "领取分享", Resources: []p.Resource{{Key: "claim", Title: "邀请码", Endpoint: "/claim", CreateLabel: "领取分享", Fields: []p.Field{c.Field("code", "邀请码", "text", true)}, Columns: []p.Field{}}}}, nil
+	})
+	a.Events(a.event)
 	return a
-}
-func (a *app) redeem(w http.ResponseWriter, r *http.Request) {
-	var b p.Record
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
-	rows, e := a.C.List("invites")
-	if c.Err(w, e) {
-		return
-	}
-	var invite p.Record
-	for _, row := range rows {
-		if row["code"] == b["code"] {
-			invite = row
-		}
-	}
-	if invite == nil || !p.Bool(invite, "enabled") || p.Number(invite, "used") >= p.Number(invite, "limit") || p.Text(invite, "expiresAt") != "" && p.Text(invite, "expiresAt") < c.Now() {
-		p.Fail(w, 400, "邀请无效、已到期或已用完")
-		return
-	}
-	var created p.Record
-	b["role"] = "member"
-	if c.Err(w, a.C.Request("POST", "/api/v1/runtime/users", b, &created)) {
-		return
-	}
-	if c.Err(w, a.redeemFor(invite, p.Text(created, "id"))) {
-		return
-	}
-	p.JSON(w, p.Record{"email": b["email"], "message": "账户已创建，可以登录"})
-}
-func (a *app) claim(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	var b p.Record
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
-	rows, e := a.C.List("invites")
-	if c.Err(w, e) {
-		return
-	}
-	for _, row := range rows {
-		if row["code"] == b["code"] {
-			if !c.Err(w, a.redeemFor(row, p.Subject(r).ID)) {
-				p.JSON(w, true)
-			}
-			return
-		}
-	}
-	p.Fail(w, 400, "邀请无效")
-}
-func (a *app) redeemFor(invite p.Record, user string) error {
-	claims, e := a.C.List("claims")
-	if e != nil {
-		return e
-	}
-	for _, v := range claims {
-		if v["userId"] == user && v["inviteId"] == invite["id"] {
-			return nil
-		}
-	}
-	if !p.Bool(invite, "enabled") || p.Number(invite, "used") >= p.Number(invite, "limit") || p.Text(invite, "expiresAt") != "" && p.Text(invite, "expiresAt") < c.Now() {
-		return fmt.Errorf("邀请无效、已到期或已用完")
-	}
-	grant := p.Record{"userId": user, "grantId": "invite-" + p.Text(invite, "id") + "-" + user, "durationUnit": "day", "durationValue": invite["days"], "quotaGiB": invite["quotaGiB"], "groups": invite["groups"]}
-	if e = a.C.Call("access", "POST", "/internal/grant", grant, nil); e != nil {
-		return e
-	}
-	if e = a.C.Put("claims", p.Record{"id": p.Text(invite, "id") + "-" + user, "inviteId": invite["id"], "userId": user, "createdAt": c.Now()}); e != nil {
-		return e
-	}
-	invite["used"] = p.Number(invite, "used") + 1
-	return a.C.Put("invites", invite)
 }
 func (a *app) view(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+	"maps"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -36,6 +37,7 @@ type mapper struct {
 	Plan        *Plan
 	Users       map[string]bool
 	Machines    map[string]bool
+	MFA         map[string]string
 	NodeCounter int64
 	UsedTables  map[string]bool
 }
@@ -48,7 +50,7 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 		return nil, e
 	}
 	plan := &Plan{SourceID: snapshot.SourceID, Mapped: map[string]int{}, ArchiveOnly: map[string]int{}, Warnings: []string{}, Errors: []string{}, Rows: []p.ImportRow{}}
-	m := &mapper{S: snapshot, Options: options, Plan: plan, Users: map[string]bool{}, Machines: map[string]bool{}, UsedTables: map[string]bool{}}
+	m := &mapper{S: snapshot, Options: options, Plan: plan, Users: map[string]bool{}, Machines: map[string]bool{}, MFA: map[string]string{}, UsedTables: map[string]bool{}}
 	m.checkPendingOrders()
 	if snapshot.Source == "sspanel" {
 		m.ssUsers()
@@ -168,10 +170,10 @@ func truth(row Row, key string) bool {
 }
 func object(row Row, key string) Row {
 	if value, ok := row[key].(map[string]any); ok {
-		return value
+		return maps.Clone(Row(value))
 	}
 	if value, ok := row[key].(Row); ok {
-		return value
+		return maps.Clone(value)
 	}
 	raw := text(row, key)
 	if raw == "" || raw == "null" {

@@ -1,0 +1,8 @@
+{
+  "name": "PxBoard 节点迁移桥接",
+  "code": "pxboard_migration_bridge",
+  "version": "1.0.0",
+  "description": "向已认证的 NodeRS 机器下发面板迁移配置并记录结果",
+  "author": "MoeClub-Open",
+  "type": "feature"
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+	"math"
 	"net/http"
 )
 
@@ -41,7 +42,7 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 			config[key] = v
 		}
 	}
-	if p.Number(config, "commissionPercent") < 0 || p.Number(config, "commissionPercent") > 100 || p.Number(config, "commissionHoldDays") < 0 {
+	if p.Number(config, "commissionPercent") < 0 || p.Number(config, "commissionPercent") > 100 || p.Number(config, "commissionHoldDays") < 0 || math.Trunc(p.Number(config, "commissionHoldDays")) != p.Number(config, "commissionHoldDays") {
 		p.Fail(w, 400, "返佣比例或冻结天数无效")
 		return
 	}

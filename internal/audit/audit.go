@@ -30,7 +30,9 @@ func New() http.Handler {
 			if _, _, e := net.ParseCIDR(p.Text(b, "pattern")); e != nil {
 				return fmt.Errorf("IP 网段无效")
 			}
-		case "domain", "keyword", "protocol":
+		case "domain":
+			b["pattern"] = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(p.Text(b, "pattern")), "."))
+		case "keyword", "protocol":
 		default:
 			return fmt.Errorf("匹配类型无效")
 		}
@@ -82,6 +84,7 @@ func matches(rule, flow p.Record) bool {
 	host := strings.ToLower(strings.TrimSuffix(p.Text(flow, "host"), "."))
 	switch p.Text(rule, "kind") {
 	case "domain":
+		pattern = strings.TrimSuffix(strings.TrimSpace(pattern), ".")
 		return host == pattern || strings.HasSuffix(host, "."+pattern)
 	case "keyword":
 		return strings.Contains(host, pattern)
