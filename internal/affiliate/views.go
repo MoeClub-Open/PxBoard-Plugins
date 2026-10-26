@@ -13,13 +13,33 @@ func (a *app) referralView(r *http.Request) (p.View, error) {
 	if e != nil {
 		return p.View{}, e
 	}
-	withdrawals := p.Resource{Key: "withdrawals", Title: "佣金结算", Endpoint: "/withdrawals", CreateLabel: "申请结算", Fields: []p.Field{c.Field("amount", "申请金额", "money", true), c.Select("method", "结算方式", "wallet|转入余额", "cash|现金提现"), c.Field("payoutAccount", "收款账户", "text", false)}, Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("method", "方式", "tag", false), c.Field("payoutAccount", "收款账户", "text", false), c.Field("amount", "金额", "money", false), c.Field("status", "状态", "status", false), c.Field("reference", "打款流水", "copy", false), c.Field("createdAt", "申请时间", "datetime", false)}}
+	withdrawals := p.Resource{
+		Key: "withdrawals", Title: "结算记录", Endpoint: "/withdrawals", CreateLabel: "结算佣金",
+		Fields: []p.Field{
+			c.Field("amount", "金额", "money", true),
+			c.Select("method", "结算方式", "wallet|转入余额", "cash|现金提现"),
+			{Key: "payoutAccount", Label: "收款账户", Type: "text", Required: true, When: map[string][]string{"method": {"cash"}}},
+		},
+		Columns: []p.Field{
+			c.Field("userId", "用户 ID", "text", false), c.Field("method", "方式", "tag", false),
+			c.Field("payoutAccount", "收款账户", "text", false), c.Field("amount", "金额", "money", false),
+			c.Field("statusLabel", "状态", "tag", false), c.Field("reference", "打款流水", "copy", false),
+			c.Field("createdAt", "创建时间", "datetime", false),
+		},
+	}
 	withdrawals.Fields[1].Default = "wallet"
 	if p.Admin(r) {
 		withdrawals.CreateLabel = ""
-		withdrawals.Actions = []p.Action{{Key: "paid", Label: "登记已打款", Confirm: "确认已经在外部完成打款？此操作只记录结果。", Fields: []p.Field{c.Field("reference", "打款流水号", "text", true)}, When: map[string][]string{"status": {"approved"}, "method": {"cash"}}}, {Key: "approve", Label: "通过", Confirm: "审批此结算申请？转入余额将计入用户余额，现金提现需要另行打款。", When: map[string][]string{"status": {"pending", "approving"}}}, {Key: "reject", Label: "拒绝", Confirm: "拒绝此申请？", When: map[string][]string{"status": {"pending"}}}}
+		withdrawals.Actions = []p.Action{
+			{Key: "paid", Label: "登记已打款", Confirm: "确认已经在外部完成打款？此操作只记录结果。", Fields: []p.Field{c.Field("reference", "打款流水号", "text", true)}, When: map[string][]string{"status": {"approved"}, "method": {"cash"}}},
+			{Key: "approve", Label: "通过", Confirm: "审批此现金提现申请？通过后需要另行打款。", When: map[string][]string{"status": {"pending"}, "method": {"cash"}}},
+			{Key: "reject", Label: "拒绝", Confirm: "拒绝此申请？", When: map[string][]string{"status": {"pending"}}},
+		}
 	} else {
-		withdrawals.Actions = []p.Action{{Key: "cancel", Label: "撤回", Confirm: "撤回此结算申请？", When: map[string][]string{"status": {"pending"}}}}
+		withdrawals.Actions = []p.Action{
+			{Key: "transfer", Label: "转入余额", Confirm: "将这笔佣金转入账户余额？", When: map[string][]string{"status": {"pending"}, "method": {"wallet"}}},
+			{Key: "cancel", Label: "取消", Confirm: "取消此结算？", When: map[string][]string{"status": {"pending"}}},
+		}
 	}
 	return p.View{Title: "推广返佣", Metrics: []p.Metric{{Label: "我的可用佣金", Value: available / 100, Unit: "元"}}, Resources: []p.Resource{{Key: "commissions", Title: "佣金记录", Endpoint: "/commissions", Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("buyerId", "购买用户", "text", false), c.Field("orderId", "订单", "copy", false), c.Field("amount", "佣金", "money", false), c.Field("status", "状态", "status", false), c.Field("availableAt", "可用时间", "datetime", false), c.Field("createdAt", "产生时间", "datetime", false)}}, withdrawals}}, nil
 }

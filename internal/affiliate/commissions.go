@@ -210,6 +210,9 @@ func (a *app) tick() error {
 		return e
 	}
 	for _, row := range withdrawals {
+		if p.Text(row, "method") != "wallet" {
+			continue
+		}
 		if e = a.creditWithdrawal(row); e != nil {
 			failures = append(failures, e)
 		}
