@@ -108,6 +108,7 @@ func (a *app) action(w http.ResponseWriter, r *http.Request) {
 	}
 	a.running[id] = true
 	a.mu.Unlock()
+	delete(job, "error")
 	if action == "preview" {
 		job["status"] = "preparing"
 	} else {
@@ -134,6 +135,7 @@ func (a *app) work(job p.Record, action string) {
 		e = a.C.Request("POST", "/api/v1/runtime/import/"+id+"/commit", p.Record{}, &report)
 		if e == nil {
 			job["status"] = report.Status
+			job["errorCount"] = len(report.Errors)
 			if len(report.Errors) > 0 {
 				job["report"] = p.Text(job, "report") + "\n\n目标检查阻断：\n" + strings.Join(report.Errors, "\n")
 			}
@@ -143,6 +145,8 @@ func (a *app) work(job p.Record, action string) {
 		job["status"] = "failed"
 		job["error"] = e.Error()
 		job["report"] = p.Text(job, "report") + "\n\n错误：" + e.Error()
+	} else {
+		delete(job, "error")
 	}
 	job["updatedAt"] = c.Now()
 	_ = a.C.Put("jobs", job)

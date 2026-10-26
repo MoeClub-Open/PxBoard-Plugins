@@ -181,15 +181,9 @@ func (a *app) sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.ReportID != "" {
-		seen, e := a.C.List("reports")
+		done, e := a.hasReport(b.ReportID)
 		if c.Err(w, e) {
 			return
-		}
-		done := false
-		for _, v := range seen {
-			if v["id"] == b.ReportID {
-				done = true
-			}
 		}
 		if !done {
 			if len(b.Usage) > 0 {

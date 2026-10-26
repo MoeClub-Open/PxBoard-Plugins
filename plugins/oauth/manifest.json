@@ -1,9 +1,9 @@
 {
   "id": "oauth",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.3.0",
+  "minCoreVersion": "0.3.2",
   "name": "第三方登录",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Google、GitHub、LinuxDO 登录及账号绑定",
   "category": "账户",
   "author": "PxBoard",
@@ -17,7 +17,9 @@
   "publicPaths": [
     "/providers",
     "/authorize",
-    "/callback"
+    "/callback",
+    "/registration",
+    "/complete-registration"
   ],
   "pages": [
     {

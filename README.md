@@ -19,7 +19,7 @@
 
 插件声明在 `plugins/<id>/manifest.json`。每个 `cmd/<id>` 仅导入该插件的业务包，自用产物不会包含商业插件。
 
-构建使用 Go 1.26 或更新版本；OAuth 插件要求核心 0.3.0+，其余插件的依赖以各自声明为准。第三方登录配置、账号绑定及独立手动搬入工具见 [OAuth 文档](docs/oauth.md)。
+构建使用 Go 1.26 或更新版本；OAuth 插件要求核心 0.3.2+，其余插件的依赖以各自声明为准。第三方登录配置、账号绑定及独立手动搬入工具见 [OAuth 文档](docs/oauth.md)。
 
 ```sh
 go build -o bin/nodes ./cmd/nodes

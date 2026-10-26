@@ -30,6 +30,7 @@ func providerConfig(row p.Record) *oauth2.Config {
 		config.Scopes = []string{"read:user", "user:email"}
 	case "linuxdo":
 		config.Endpoint.AuthURL, config.Endpoint.TokenURL = "https://connect.linux.do/oauth2/authorize", "https://connect.linux.do/oauth2/token"
+		config.Endpoint.AuthStyle = oauth2.AuthStyleInHeader
 		config.Scopes = []string{"openid", "email", "profile"}
 	}
 	return config
@@ -84,6 +85,9 @@ func fetchIdentity(ctx context.Context, config *oauth2.Config, kind, code, verif
 	}
 	result := identity{Subject: profileID(profile["id"]), DisplayName: p.Text(profile, "name"), Email: strings.ToLower(strings.TrimSpace(p.Text(profile, "email"))), EmailVerified: p.Bool(profile, "email_verified")}
 	if kind == "google" {
+		result.Subject = profileID(profile["sub"])
+	}
+	if kind == "linuxdo" && result.Subject == "" {
 		result.Subject = profileID(profile["sub"])
 	}
 	if result.DisplayName == "" {

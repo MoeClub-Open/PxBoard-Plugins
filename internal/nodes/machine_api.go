@@ -120,15 +120,13 @@ func (a *app) machineTraffic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := fmt.Sprintf("machine-%.0f-node-%.0f-%s", p.Number(m, "number"), p.Number(n, "wireId"), b.BatchID)
-	seen, e := a.C.List("reports")
+	seen, e := a.hasReport(id)
 	if c.Err(w, e) {
 		return
 	}
-	for _, row := range seen {
-		if row["id"] == id {
-			p.JSON(w, p.Record{"accepted": true, "duplicate": true})
-			return
-		}
+	if seen {
+		p.JSON(w, p.Record{"accepted": true, "duplicate": true})
+		return
 	}
 	var users []p.Record
 	if c.Err(w, a.C.Call("access", "GET", "/internal/accounts", nil, &users)) {
@@ -150,7 +148,7 @@ func (a *app) machineTraffic(w http.ResponseWriter, r *http.Request) {
 	if len(usage) > 0 && c.Err(w, a.C.Emit("traffic.reported", p.Record{"nodeId": n["id"], "reportId": id, "rate": n["trafficRate"], "usage": usage})) {
 		return
 	}
-	if c.Err(w, a.C.Put("reports", p.Record{"id": id, "createdAt": c.Now()})) {
+	if c.Err(w, a.C.Put("reports", p.Record{"id": id, "machineId": m["number"], "nodeId": n["wireId"], "batchId": b.BatchID, "accounts": b.Accounts, "trafficRate": n["trafficRate"], "createdAt": c.Now()})) {
 		return
 	}
 	n["lastSeen"] = c.Now()

@@ -101,7 +101,7 @@ func (a *app) providerSettings(w http.ResponseWriter, r *http.Request) {
 	row["publicUrl"], row["updatedAt"] = publicURL, c.Now()
 	if redirect := p.Text(row, "redirectUri"); redirect != "" {
 		callback, e := url.Parse(redirect)
-		if e != nil || callback.Scheme != u.Scheme || callback.Host != u.Host || callback.User != nil || callback.RawQuery != "" || callback.Fragment != "" || !strings.HasPrefix(callback.Path, "/") {
+		if e != nil || callback.Scheme != u.Scheme || !strings.EqualFold(callback.Hostname(), u.Hostname()) || callback.User != nil || callback.RawQuery != "" || callback.Fragment != "" || !strings.HasPrefix(callback.Path, "/") {
 			p.Fail(w, 400, "回调地址必须位于同一面板域名下，且不含查询参数")
 			return
 		}

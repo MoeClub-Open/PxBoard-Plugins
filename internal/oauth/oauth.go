@@ -24,6 +24,8 @@ func New() http.Handler {
 	a.Mux.HandleFunc("POST /authorize", a.authorize)
 	a.Mux.HandleFunc("GET /callback/{provider}", a.callback)
 	a.Mux.HandleFunc("POST /complete-binding", a.completeBinding)
+	a.Mux.HandleFunc("POST /registration", a.registration)
+	a.Mux.HandleFunc("POST /complete-registration", a.completeRegistration)
 	a.Mux.HandleFunc("GET /bindings", a.bindings)
 	a.Mux.HandleFunc("DELETE /bindings/{id}", a.deleteBinding)
 	a.Mux.HandleFunc("POST /bindings/import", a.importBindings)

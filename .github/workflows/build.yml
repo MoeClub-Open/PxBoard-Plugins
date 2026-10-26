@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: MoeClub-Open/PxBoard
-          ref: v0.3.0
+          ref: v0.3.2
           path: PxBoard
           persist-credentials: false
       - uses: actions/setup-go@v7

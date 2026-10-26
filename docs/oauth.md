@@ -1,6 +1,6 @@
 # 第三方登录
 
-`oauth` 是可选官方插件，要求 PxBoard 核心 `0.3.0` 或更新版本。支持 Google、GitHub 和 LinuxDO；不依赖商业插件，不随 Xboard 数据导入插件自动安装或转换绑定数据。
+`oauth` 是可选官方插件，当前 `1.0.1` 要求 PxBoard 核心 `0.3.2` 或更新版本。支持 Google、GitHub 和 LinuxDO；不依赖商业插件，不随 Xboard 数据导入插件自动安装或转换绑定数据。
 
 ## 配置登录服务
 
@@ -24,9 +24,11 @@ https://panel.example.com/api/v1/extensions/oauth/callback/<登录服务配置ID
 
 生产环境必须使用 HTTPS。本机开发可使用 `http://127.0.0.1:<端口>` 或 `http://localhost:<端口>`。配置的面板地址应与核心公开地址和浏览器访问地址一致。
 
-Google 请求 `openid email profile`，GitHub 请求 `read:user user:email`，LinuxDO 请求 `openid email profile`。插件使用提供方服务端返回的稳定账号标识，不把用户名或邮箱当作第三方身份标识。客户端密钥只保存在服务端，管理查询也不返回密钥值；编辑时留空表示保留原密钥。
+Google 请求 `openid email profile`，GitHub 请求 `read:user user:email`，LinuxDO 请求 `openid email profile`，通过 HTTP Basic 交换授权码。LinuxDO 当前公布的 [服务配置](https://connect.linux.do/.well-known/openid-configuration) 支持这些范围和 PKCE，但不承诺 `email_verified`，不能假定它提供已验证邮箱。插件使用提供方服务端返回的稳定账号标识，不把用户名或邮箱当作第三方身份标识。客户端密钥只保存在服务端，管理查询也不返回密钥值；编辑时留空表示保留原密钥。
 
-允许注册时，提供方必须返回已验证的邮箱。如果该邮箱已存在，插件要求用户使用原方式登录后手动绑定，不会按邮箱自动接管已有账号。新账号与首次登录绑定在同一事务创建，避免注册中断留下无法登录的账号。新账号使用随机初始密码；需要密码登录时，通过已配置的邮件找回功能设置密码。
+允许注册时，提供方有已验证邮箱可以直接创建新账号；没有可信邮箱时会进入“完成注册”，由用户填写邮箱和至少 10 位登录密码，沿用普通注册规则，不依赖提供方是否实现邮箱验证字段。如果该邮箱已存在，插件要求用户使用原方式登录后手动绑定，不会按邮箱自动接管已有账号，也不会生成虚拟邮箱。
+
+新账号与首次登录绑定在同一事务创建，避免注册中断留下无法登录的账号。“完成注册”的请求保存在服务端，绑定发起授权的浏览器，十分钟内有效，成功后消费；填写错误可在有效期内更正。直接创建的账号使用随机初始密码，需要密码登录时通过已配置的邮件找回功能设置；在“完成注册”填写的密码可直接用于后续登录。
 
 ## 登录与绑定
 
@@ -81,7 +83,7 @@ unset PX_OAUTH_ADMIN_TOKEN
 
 所有服务和目标用户必须存在。发现跨用户冲突、同用户同服务重复身份或错误日期时，整批拒绝；检查通过后使用一个事务写入。同一文件重复执行会跳过相同绑定，不覆盖现有绑定。不创建新用户，不修改密码，也不搬入客户端或其他扩展的数据。
 
-如需复用原提供方已登记回调，先在服务配置中填写同域名的原回调地址，再由反向代理将该路径转到本插件对应回调，保留查询参数。授权请求和交换授权码使用同一个登记地址。完成提供方控制台调整后，可移除该临时路径，改用插件默认回调。
+如需复用原提供方已登记回调，先在服务配置中填写同域名、同协议的原回调地址，再由反向代理将该路径转到本插件对应回调，保留查询参数。迁移预演时允许面板入口与登记回调使用不同端口；提供方仍会精确检查完整回调地址。授权请求和交换授权码使用同一个登记地址。完成提供方控制台调整后，可移除该临时路径，改用插件默认回调。
 
 ## 接口
 
@@ -93,6 +95,8 @@ unset PX_OAUTH_ADMIN_TOKEN
 | `POST /authorize` | 发起登录；`purpose=bind` 时需要用户会话；参数为 `providerId/purpose/proof/redirectPath` |
 | `GET /callback/{provider}` | 提供方回调，仅处理服务端已保存的一次性授权状态 |
 | `POST /complete-binding` | 当前用户以 `ticket/proof` 确认绑定 |
+| `POST /registration` | 以待注册 `ticket/proof` 查询服务名称与到期时间，不返回提供方邮箱 |
+| `POST /complete-registration` | 以 `ticket/proof/email/password` 完成新账号注册，返回核心登录凭证 |
 | `GET /bindings` | 当前用户的绑定列表，含 `requiresPassword` |
 | `DELETE /bindings/{id}` | 解除自己的绑定；最后一条需要请求体 `password/code` |
 | `GET/POST /settings/providers` | 管理员查询或创建服务配置 |

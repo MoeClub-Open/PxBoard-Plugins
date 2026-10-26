@@ -2,10 +2,8 @@ package oauth
 
 import (
 	"crypto/subtle"
-	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
@@ -30,7 +28,7 @@ func (a *app) authorize(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "此登录服务未启用")
 		return
 	}
-	if c.Err(w, a.cleanup("flows")) || c.Err(w, a.cleanup("pendingBindings")) {
+	if c.Err(w, a.cleanup("flows")) || c.Err(w, a.cleanup("pendingBindings")) || c.Err(w, a.cleanup("pendingRegistrations")) {
 		return
 	}
 	state, verifier := p.ID()+p.ID(), oauth2.GenerateVerifier()
@@ -94,9 +92,18 @@ func (a *app) callback(w http.ResponseWriter, r *http.Request) {
 		redirectResult(w, r, provider, purpose, ticket, "")
 		return
 	}
-	userID, e := a.loginIdentity(provider, profile)
+	userID, needsRegistration, e := a.loginIdentity(provider, profile)
 	if e != nil {
 		redirectResult(w, r, provider, purpose, "", e.Error())
+		return
+	}
+	if needsRegistration {
+		ticket := p.ID() + p.ID()
+		row := p.Record{"id": ticket, "providerId": provider["id"], "providerVersion": provider["updatedAt"], "subject": profile.Subject, "displayName": profile.DisplayName, "proofDigest": flow["proofDigest"], "redirectPath": flow["redirectPath"], "expiresAt": expiresAfter(10 * time.Minute)}
+		if c.Err(w, a.C.Put("pendingRegistrations", row)) {
+			return
+		}
+		redirectResult(w, r, provider, "register", ticket, "")
 		return
 	}
 	grant, e := a.C.CreateLoginGrant(userID, p.Text(flow, "proofDigest"), p.Text(flow, "redirectPath"))
@@ -105,41 +112,6 @@ func (a *app) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirectResult(w, r, provider, purpose, grant.Ticket, "")
-}
-
-func (a *app) loginIdentity(provider p.Record, profile identity) (string, error) {
-	rows, e := a.C.List("bindings")
-	if e != nil {
-		return "", e
-	}
-	for _, row := range rows {
-		if p.Text(row, "providerId") == p.Text(provider, "id") && p.Text(row, "subject") == profile.Subject {
-			return p.Text(row, "userId"), nil
-		}
-	}
-	if !p.Bool(provider, "allowRegistration") {
-		return "", fmt.Errorf("此第三方账号尚未绑定，请先登录已有账号并在账户页绑定")
-	}
-	if !profile.EmailVerified || !strings.Contains(profile.Email, "@") {
-		return "", fmt.Errorf("此登录服务未提供已验证邮箱，请先注册后绑定")
-	}
-	users, e := a.C.Users()
-	if e != nil {
-		return "", e
-	}
-	for _, user := range users {
-		if strings.EqualFold(p.Text(user, "email"), profile.Email) {
-			return "", fmt.Errorf("该邮箱已有账号，请用原方式登录后绑定")
-		}
-	}
-	userID, e := a.C.CreateUserWithRecord(profile.Email, profile.DisplayName, p.ID()+p.ID(), "bindings", p.Record{
-		"id": bindingID(p.Text(provider, "id"), profile.Subject), "providerId": provider["id"],
-		"subject": profile.Subject, "displayName": profile.DisplayName, "createdAt": c.Now(),
-	})
-	if e != nil {
-		return "", fmt.Errorf("无法创建账号，请稍后重试")
-	}
-	return userID, nil
 }
 
 func (a *app) completeBinding(w http.ResponseWriter, r *http.Request) {

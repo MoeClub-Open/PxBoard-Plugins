@@ -1,7 +1,7 @@
 {
   "id": "import-xboard",
   "name": "从 Xboard 导入",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "apiVersion": "1.0",
   "description": "保留原密码、连接凭据、余额、流量和套餐信息，支持导入预览与冲突检查",
   "category": "迁移",
