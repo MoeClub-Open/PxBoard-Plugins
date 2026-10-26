@@ -14,7 +14,7 @@
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "dependencies": {},
   "homepage": "",
   "description": "访问额度、到期限制、分组、周期流量重置和权益开通",
@@ -31,5 +31,5 @@
     }
   ],
   "summary": true,
-  "minCoreVersion": "0.3.0"
+  "minCoreVersion": "0.4.0"
 }

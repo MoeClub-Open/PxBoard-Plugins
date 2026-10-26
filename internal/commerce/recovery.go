@@ -3,56 +3,26 @@ package commerce
 import (
 	"errors"
 	"fmt"
-	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"time"
 )
 
 func (a *app) walletDebited(order p.Record) (bool, error) {
-	rows, e := a.C.List("ledger")
-	for _, row := range rows {
-		if p.Text(row, "id") == "order-"+p.Text(order, "id") {
-			return true, e
-		}
-	}
-	return false, e
+	rows, e := a.records("ledger", p.Record{"field": "id", "value": "order-" + p.Text(order, "id")})
+	return len(rows) > 0, e
 }
 
 func (a *app) tick() error {
-	commissions, e := a.C.List("commissions")
-	if e != nil {
-		return e
-	}
 	var failures []error
-	for _, row := range commissions {
-		if p.Text(row, "status") == "pending" && p.Text(row, "availableAt") <= c.Now() {
-			row["status"] = "available"
-			if e = a.C.Put("commissions", row); e != nil {
-				failures = append(failures, e)
-			}
+	orders := map[string]p.Record{}
+	filters := []p.Record{{"field": "status", "value": "paid"}, {"field": "status", "value": "refunding"}, {"field": "status", "value": "pending"}, {"field": "notificationPending", "value": true}, {"field": "refundNotificationPending", "value": true}}
+	for _, filter := range filters {
+		rows, e := a.records("orders", filter)
+		if e != nil {
+			return e
 		}
-	}
-	orders, e := a.C.List("orders")
-	if e != nil {
-		return e
-	}
-	ledger, e := a.C.List("ledger")
-	if e != nil {
-		return e
-	}
-	debited := map[string]bool{}
-	for _, row := range ledger {
-		debited[p.Text(row, "id")] = true
-	}
-	gifts, e := a.C.List("gifts")
-	if e != nil {
-		return e
-	}
-	for _, gift := range gifts {
-		if p.Text(gift, "status") == "used" && p.Text(gift, "userId") != "" && !debited["gift-"+p.Text(gift, "id")] {
-			if e = a.creditGift(gift); e != nil {
-				failures = append(failures, e)
-			}
+		for _, row := range rows {
+			orders[p.Text(row, "id")] = row
 		}
 	}
 	for _, row := range orders {
@@ -63,7 +33,10 @@ func (a *app) tick() error {
 		case "refunding":
 			err = a.refund(row)
 		case "pending":
-			if debited["order-"+p.Text(row, "id")] {
+			debited, checkErr := a.walletDebited(row)
+			if checkErr != nil {
+				err = checkErr
+			} else if debited {
 				row["method"] = "wallet"
 				err = a.paid(row)
 			} else if created, parseErr := time.Parse(time.RFC3339, p.Text(row, "createdAt")); parseErr == nil && time.Since(created) > 24*time.Hour {
@@ -73,6 +46,10 @@ func (a *app) tick() error {
 		case "fulfilled":
 			if p.Bool(row, "notificationPending") {
 				err = a.notifyFulfilled(row)
+			}
+		case "refunded":
+			if p.Bool(row, "refundNotificationPending") {
+				err = a.notifyRefunded(row)
 			}
 		}
 		if err != nil {
@@ -87,16 +64,13 @@ func (a *app) paymentReview(data p.Record, reason string) error {
 }
 
 func (a *app) paymentSucceeded(data p.Record) error {
-	orders, e := a.C.List("orders")
+	orders, e := a.records("orders", p.Record{"field": "id", "value": p.Text(data, "orderId")})
 	if e != nil {
 		return e
 	}
 	var row p.Record
-	for _, order := range orders {
-		if p.Text(order, "id") == p.Text(data, "orderId") {
-			row = order
-			break
-		}
+	if len(orders) > 0 {
+		row = orders[0]
 	}
 	if row == nil {
 		return a.paymentReview(data, "找不到对应订单")

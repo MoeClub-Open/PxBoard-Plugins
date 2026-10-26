@@ -5,6 +5,7 @@ import (
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"net/http"
+	"reflect"
 	"time"
 )
 
@@ -14,6 +15,7 @@ func New() http.Handler {
 	a := &app{c.New()}
 	a.machineAPI()
 	a.monitoring()
+	a.settingsAPI()
 	res := resource()
 	a.CRUD(res, a.normalize)
 	a.View("nodes", a.view)
@@ -36,10 +38,12 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /internal/nodes", a.internal)
 	return a
 }
-func resource() p.Resource {
-	return p.Resource{Key: "nodes", Title: "节点", Endpoint: "/nodes", CreateLabel: "添加节点", Editable: true, Deletable: true, Empty: "添加一台服务器，开始连接节点", Columns: []p.Field{c.Field("name", "节点名称", "text", false), c.Field("region", "地区", "text", false), c.Field("host", "服务器", "text", false), c.Field("protocol", "协议", "tag", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("error", "运行错误", "text", false), c.Field("enabled", "启用", "boolean", false)}, Fields: []p.Field{c.Field("name", "节点名称", "text", true), c.Field("region", "地区", "text", false), c.Field("host", "服务器地址", "text", true), c.Field("port", "端口", "number", true), c.Select("engine", "代理内核", "xray|Xray", "sing-box|sing-box", "noders|NodeRS"), c.Select("protocol", "协议", "vless|VLESS", "vmess|VMess", "trojan|Trojan", "shadowsocks|Shadowsocks", "hysteria2|Hysteria 2", "anytls|AnyTLS", "tuic|TUIC", "mieru|Mieru", "sudoku|Sudoku", "naive|Naive"), c.Field("tls", "启用 TLS", "boolean", false), c.Field("serverName", "证书域名", "text", false), c.Field("certPath", "服务器证书路径", "text", false), c.Field("keyPath", "服务器私钥路径", "text", false), c.Field("groups", "节点分组（逗号分隔）", "text", true), c.Field("trafficRate", "流量倍率", "number", true), c.Field("enabled", "启用节点", "boolean", false)}, Actions: []p.Action{{Key: "rotate", Label: "接入令牌", Confirm: "生成新的节点接入令牌？原令牌会立即失效。"}}}
-}
 func (a *app) normalize(r *http.Request, b, old p.Record) error {
+	transportChanged := b["transport"] != nil
+	_, certificatePatched := b["certConfig"]
+	mergeNodeSettings(b, old)
+	certificateChanged := certificatePatched && !reflect.DeepEqual(b["certConfig"], old["certConfig"])
+	c.Defaults(b, old, old)
 	if old == nil {
 		number, e := a.nextNumber("nodes", "wireId")
 		if e != nil {
@@ -49,7 +53,9 @@ func (a *app) normalize(r *http.Request, b, old p.Record) error {
 	} else {
 		b["wireId"] = old["wireId"]
 	}
-	c.Defaults(b, old, p.Record{"engine": "xray", "protocol": "vless", "port": 443.0, "trafficRate": 1.0, "enabled": true, "tls": true, "groups": "default", "agentToken": p.ID() + p.ID()})
+	protocol := p.Text(b, "protocol")
+	tls := protocol != "mieru" && protocol != "shadowsocks" && protocol != "sudoku"
+	c.Defaults(b, old, p.Record{"engine": "noders", "protocol": "anytls", "port": 443.0, "trafficRate": 1.0, "enabled": true, "visible": true, "tls": tls, "groups": "default", "agentToken": p.ID() + p.ID()})
 	if e := c.Validate(b, "name", "host", "engine", "protocol"); e != nil {
 		return e
 	}
@@ -74,7 +80,7 @@ func (a *app) normalize(r *http.Request, b, old p.Record) error {
 	if p.Number(b, "port") <= 0 || p.Number(b, "port") > 65535 || p.Number(b, "trafficRate") <= 0 {
 		return fmt.Errorf("端口或流量倍率无效")
 	}
-	return nil
+	return normalizeNodeConnection(b, old == nil, transportChanged, certificateChanged)
 }
 func (a *app) view(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
@@ -86,6 +92,8 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		return p.View{}, e
 	}
 	mf := c.Field("machineId", "接入机器（NodeRS）", "select", false)
+	mf.Required = true
+	mf.When = map[string][]string{"engine": {"noders"}}
 	for _, machine := range machines {
 		mf.Options = append(mf.Options, p.Option{Label: fmt.Sprintf("%.0f · %s", p.Number(machine, "number"), p.Text(machine, "name")), Value: machine["number"]})
 	}
@@ -97,9 +105,9 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		case "trafficRate":
 			res.Fields[i].Default = 1
 		case "engine":
-			res.Fields[i].Default = "xray"
+			res.Fields[i].Default = "noders"
 		case "protocol":
-			res.Fields[i].Default = "vless"
+			res.Fields[i].Default = "anytls"
 		case "groups":
 			res.Fields[i].Default = "default"
 		case "enabled", "tls":

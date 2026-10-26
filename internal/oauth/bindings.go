@@ -111,6 +111,9 @@ func (a *app) deleteBinding(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if c.Err(w, a.preserveRegistration(row)) {
+		return
+	}
 	if !c.Err(w, a.C.Delete("bindings", r.PathValue("id"))) {
 		p.JSON(w, true)
 	}

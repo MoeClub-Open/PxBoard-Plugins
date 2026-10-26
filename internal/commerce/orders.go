@@ -36,7 +36,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 	requestID := p.Text(b, "requestId")
 	intent := map[string]any{"planId": p.Text(b, "planId"), "kind": p.Text(b, "kind"), "amount": p.Number(b, "amount"), "coupon": strings.TrimSpace(p.Text(b, "coupon"))}
 	if requestID != "" {
-		orders, e := a.C.List("orders")
+		orders, e := a.records("orders", p.Record{"field": "userId", "value": user}, p.Record{"field": "requestId", "value": requestID})
 		if c.Err(w, e) {
 			return
 		}
@@ -183,15 +183,9 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if p.Text(row, "status") == "pending" {
-			ledger, e2 := a.C.List("ledger")
+			already, e2 := a.walletDebited(row)
 			if c.Err(w, e2) {
 				return
-			}
-			already := false
-			for _, v := range ledger {
-				if v["id"] == "order-"+p.Text(row, "id") {
-					already = true
-				}
 			}
 			if !already {
 				balance, e2 := a.balance(p.Text(row, "userId"))
@@ -235,6 +229,10 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 		e = a.paid(row)
 	case "refund":
 		if !c.Require(w, r) {
+			return
+		}
+		if p.Text(row, "status") == "refunded" {
+			p.JSON(w, row)
 			return
 		}
 		if p.Text(row, "kind") == "recharge" {

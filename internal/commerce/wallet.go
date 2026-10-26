@@ -5,11 +5,10 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"math"
 	"net/http"
-	"strings"
 )
 
 func (a *app) balance(user string) (float64, error) {
-	rows, e := a.C.List("ledger")
+	rows, e := a.records("ledger", p.Record{"field": "userId", "value": user})
 	sum := 0.0
 	for _, row := range rows {
 		if row["userId"] == user {
@@ -55,75 +54,4 @@ func (a *app) adjust(w http.ResponseWriter, r *http.Request) {
 	if !c.Err(w, a.C.Put("ledger", row)) {
 		p.JSON(w, row)
 	}
-}
-func (a *app) redeem(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
-	var b p.Record
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
-	rows, e := a.C.List("gifts")
-	if c.Err(w, e) {
-		return
-	}
-	for _, row := range rows {
-		if row["code"] != b["code"] {
-			continue
-		}
-		if p.Text(row, "status") != "unused" && row["userId"] != p.Subject(r).ID || p.Text(row, "status") == "unused" && p.Text(row, "expiresAt") != "" && p.Text(row, "expiresAt") < c.Now() {
-			p.Fail(w, 400, "充值卡已使用或已到期")
-			return
-		}
-		row["status"] = "used"
-		row["userId"] = p.Subject(r).ID
-		if p.Text(row, "usedAt") == "" {
-			row["usedAt"] = c.Now()
-		}
-		if c.Err(w, a.C.Put("gifts", row)) {
-			return
-		}
-		if !c.Err(w, a.creditGift(row)) {
-			p.JSON(w, true)
-		}
-		return
-	}
-	p.Fail(w, 400, "充值卡不存在")
-}
-func (a *app) creditGift(row p.Record) error {
-	return a.C.Put("ledger", p.Record{"id": "gift-" + p.Text(row, "id"), "userId": row["userId"], "amount": row["amount"], "reason": "充值卡兑换", "createdAt": row["usedAt"]})
-}
-func (a *app) register(w http.ResponseWriter, r *http.Request) {
-	config, e := a.config()
-	if c.Err(w, e) {
-		return
-	}
-	if !businessEnabled(config) || !p.Bool(config, "registrationEnabled") {
-		p.Fail(w, 403, "本站暂未开放注册")
-		return
-	}
-	var b p.Record
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
-	var user p.Record
-	if c.Err(w, a.C.Request("POST", "/api/v1/runtime/users", b, &user)) {
-		return
-	}
-	if ref := strings.TrimSpace(p.Text(b, "referral")); ref != "" {
-		users, e := a.C.Users()
-		if c.Err(w, e) {
-			return
-		}
-		for _, u := range users {
-			if u["id"] == ref && u["id"] != user["id"] {
-				if c.Err(w, a.C.Put("referrals", p.Record{"id": user["id"], "userId": user["id"], "parentId": ref, "createdAt": c.Now()})) {
-					return
-				}
-				break
-			}
-		}
-	}
-	p.JSON(w, p.Record{"message": "注册成功，可以登录", "id": user["id"]})
 }

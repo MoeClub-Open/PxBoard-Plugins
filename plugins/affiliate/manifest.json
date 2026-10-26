@@ -1,0 +1,17 @@
+{
+  "id": "affiliate",
+  "name": "推广返佣",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "minCoreVersion": "0.4.0",
+  "description": "推荐关系、返佣规则、佣金结算和提现审批",
+  "category": "商业",
+  "author": "PxBoard",
+  "dependencies": { "commerce": ">=1.4.0" },
+  "permissions": ["storage:own", "users:read", "call:commerce"],
+  "events": ["account.registered", "order.fulfilled", "order.refunded", "system.tick"],
+  "pages": [
+    { "id": "referrals", "title": "推广返佣", "icon": "share", "group": "运营", "roles": ["admin", "member"] },
+    { "id": "settings", "title": "推广设置", "icon": "settings", "group": "运营", "roles": ["admin"] }
+  ]
+}

@@ -25,9 +25,10 @@ func (a *app) providers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := []p.Record{}
+	registrationEnabled := a.registrationEnabled()
 	for _, row := range rows {
 		if p.Bool(row, "enabled") {
-			out = append(out, p.Record{"id": row["id"], "name": row["name"], "kind": row["kind"], "allowRegistration": row["allowRegistration"]})
+			out = append(out, p.Record{"id": row["id"], "name": row["name"], "kind": row["kind"], "allowRegistration": registrationEnabled && p.Bool(row, "allowRegistration")})
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")

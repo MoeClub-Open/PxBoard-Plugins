@@ -2,7 +2,7 @@
 
 迁移插件将用户、现有访问权益、余额、套餐和订阅转换为 PxBoard 数据。未转换的旧表与原字段保留在迁移快照和归档中，不会作为新业务自动运行。
 
-要求 PxBoard 核心 0.3.0 或更新版本，迁移插件 1.2.0 或更新版本，`access`、`commerce`、`nodes` 1.3.0 或更新版本，`subscriptions` 1.2.0 或更新版本。插件接口版本为 `1.0`。
+要求 PxBoard 核心 0.4.0 或更新版本，迁移插件 1.3.0 或更新版本，`commerce` 1.4.0 或更新版本，`access`、`nodes` 1.3.0 或更新版本，`subscriptions` 1.2.0 或更新版本。插件接口版本为 `1.0`。
 
 ## 安装与选择来源
 
@@ -14,6 +14,8 @@
 
 在插件中心安装对应来源的插件。`access`、`commerce`、`subscriptions` 是必要依赖；勾选“同时导入节点和机器”时还需要安装并启用 `nodes`。只有管理员可以创建任务、预览、提交和查看原始归档。
 
+推广返佣由独立 `affiliate` 插件提供，兑换功能由独立 `redeem` 插件提供；迁移用户、套餐和钱包余额不要求安装这两个插件。需要原推广关系和佣金时，先安装并启用 `affiliate`，再在新任务中选择“同时导入推广关系与佣金”。选择后目标插件缺失或停用会被核心预览检查阻断。
+
 不同分支可能修改字段含义、密码算法或套餐结构。预览报告中的阻断问题必须处理完毕才能提交；不能识别的关键数据不会用默认值代替后继续导入。该功能不承诺适配所有历史分支。
 
 ## 导入范围
@@ -23,11 +25,17 @@
 - 用户邮箱、名称、角色、停用状态、创建时间、原登录密码编码和已识别的动态验证码密钥。
 - 连接 UUID、SSPanel 独立连接密码、限速、设备数限制、分组、访问等级和到期时间。
 - 当前流量额度、已用上传及下载流量、重置方式和重置时区。
-- 用户余额；V2Board / Xboard 的可用佣金余额、推荐关系及相关用户配置。
+- 用户钱包余额和个人折扣；选择推广导入后，另行转换 V2Board / Xboard 可用佣金余额、推荐关系和个人推广规则。
 - 套餐名称、价格、周期、流量、分组、限速和原套餐内容。
 - 原订阅令牌。
 
 节点和机器是可选项。历史订单、支付配置、优惠码、充值卡、审计规则、旧页面设置及其他未转换内容只归档，不会重放扣款、开通权益或自动启用。
+
+推广导入默认关闭。源用户存在非零可用佣金时，未选择推广导入会明确阻断，不能把尚可提取的金额只放进归档。没有可用佣金时可以只迁移主要账户业务，原推广关系、规则及历史购买标记留在原始归档中，后续安装推广插件不会自动恢复这些数据。
+
+SSPanel 原生已结算返利包含在用户钱包余额中，不再重复生成推广佣金。选择推广导入时，转换 `ref_by` 关系及已激活/已过期订单的购买历史；原返利日志仍只归档。
+
+三来源的原邀请码和兑换码目前均仅归档，不能直接在 PxBoard 使用；需要在 `redeem` 中按可表达的规则重新创建。模板共享使用次数、跨模板个人限用、随机奖励等规则不能用单码次数替代，也不会静默放宽后启用。已迁移用户余额与套餐权益不依赖这些原码再次兑换。原版外的 OAuth、客户端扩展仍按各自模块单独接入。
 
 SSPanel 商品默认停售并标记为待核对，完整商品内容、原记录和购买限制仍然保留。V2Board / Xboard 分别保留新购、显示及续费开关；隐藏套餐不会出现在公开目录，原套餐用户可依照原续费开关续费。限售规则尚不能直接执行时，对应套餐停售并标记待核对。核对原规则、期限和访问权益后，再编辑套餐并决定是否上架。
 
@@ -129,8 +137,8 @@ Remove-Item Env:PX_MIGRATION_DSN
 | 连接凭据 | `uuid` 与 `passwd` 分开处理 | `uuid` | 不重置原 UUID；SSPanel 连接密码单独保留 |
 | 账号状态 | `is_banned`、`is_shadow_banned`、旧 `enable` | `banned` 等字段 | 保留停用或暂停语义 |
 | 余额 | `money`，单位元 | `balance`，单位分 | 精确转为整数分，作为迁移期初余额写入一次 |
-| 佣金 | 原始记录归档 | `commission_balance`，单位分 | 单独保存迁移期初可用佣金；不重放旧佣金日志 |
-| 个人折扣与返佣 | 原始记录归档 | `discount`、`commission_rate`、`commission_type` | 保存个人折扣、个人返佣比例及首次/持续/跟随系统方式；原有效订单用于判断是否已有购买历史 |
+| 佣金 | 已结算金额包含在原钱包余额中 | `commission_balance`，单位分 | 选择推广导入后写入 `affiliate/commissions` 作为期初可用佣金；不重放旧佣金日志；未选但金额非零会阻断 |
+| 个人折扣与返佣 | 推广关系按选项转换，其余原始记录归档 | `discount`、`commission_rate`、`commission_type` | 个人折扣写入 `commerce/customers`；返佣比例、方式及购买历史写入可选 `affiliate/profiles` |
 | 当前流量 | `u`、`d`、`transfer_enable`，单位字节 | 同名用户字段，单位字节 | 保留已用流量基线与额度，上传和下载原值也保留 |
 | 节点权限 | `node_group`、`class`、`class_expire` | `group_id`、套餐关系 | 保留来源分组；SSPanel 普通用户包含公共组 0 与自身组，管理员保留跨组权限 |
 | 限速和设备数 | `node_speedlimit`、`node_iplimit` | `speed_limit`、`device_limit` | 保存对应账户限制 |
@@ -143,7 +151,30 @@ V2Board / Xboard 的 `expired_at=null` 表示长期；数值 `0` 表示已到期
 
 流量重置保留日历规则和时区。SSPanel 使用 `auto_reset_day`、`auto_reset_bandwidth` 等字段；V2Board / Xboard 支持每月 1 日、按到期日每月、从不、每年 1 月 1 日、按到期日每年五种方式。源字段提供 `next_reset_at` 时保留下一次重置时间。套餐跟随系统设置却未提供实际系统重置方式时，预览会阻断。
 
-个人折扣在创建新套餐订单时从原价扣减；目标订单保留折扣金额。返佣方式为“跟随系统”时，使用 PxBoard 运营设置的比例及“仅首次购买返佣”选项，需要与源站实际设置核对。源站全局推广比例、冻结周期及其他系统设置不会自动覆盖目标设置。原始订单仍只归档，购买历史标记只用于防止给老用户再次发放首次购买佣金。
+个人折扣在创建新套餐订单时从原价扣减；目标订单保留折扣金额。返佣方式为“跟随系统”时，使用独立推广插件的比例及“仅首次购买返佣”选项，需要与源站实际设置核对。V2Board / Xboard 原个人 `commission_rate` 为零或未设置时表示继承，因此不写 `commissionPercent`；新推广插件显式 `commissionPercent=0` 则表示不返佣，两者不能混淆。源站全局推广比例、冻结周期及其他系统设置不会自动覆盖目标设置。原始订单仍只归档，购买历史标记只用于防止给老用户再次发放首次购买佣金。
+
+### 已完成旧版 PxBoard 导入的目标
+
+已经使用旧版插件完成导入的目标，不重新导入用户或重复写入期初余额。使用 [一次性推广数据转换工具](../tools/migrate-commerce-affiliate.ts) 把旧商业插件中的推广数据搬到独立插件；工具需要 Node.js 24 或更新版本。
+
+| 旧位置 | 新位置 | 转换规则 |
+| --- | --- | --- |
+| `commerce/referrals` | `affiliate/referrals` | 原标识及全部字段原样保留 |
+| `commerce/commissions` | `affiliate/commissions` | 原佣金标识、金额、状态、来源和时间不变，不重复入账 |
+| `commerce/withdrawals` | `affiliate/withdrawals` | 原记录保留；已存在同金额钱包账本的处理中钱包转账改为已批准，防止再次入账 |
+| `commerce/customers` 的推广字段 | `affiliate/profiles`，标识为 `userId` | 移出 `commissionPercent`、`commissionMode`、`hasPriorPurchase`，保留个人折扣及其他商业字段；旧零个人比例转换为继承 |
+| `commerce/settings` 的推广字段 | `affiliate/settings/settings` | 仅搬 `commissionPercent`、`commissionHoldDays`、`commissionFirstPurchaseOnly` |
+
+先检查，再停止目标 PxBoard 并执行写入：
+
+```sh
+node tools/migrate-commerce-affiliate.ts --database /srv/pxboard/data/pxboard.db
+node tools/migrate-commerce-affiliate.ts --database /srv/pxboard/data/pxboard.db --apply
+```
+
+写入前生成独立数据库备份，变更在一个事务中完成。目标已有不同内容时整批拒绝；目标已有相同内容时不重复创建，重复运行不会重复发放余额或佣金。用户标识、访问账户、套餐、订阅和钱包账本不搬家。完成后安装并启用 `affiliate`，核对佣金和提现；旧商业推广路由不再保留兼容入口。
+
+旧 PxBoard 的 `sharing.invites/claims` 和 `commerce.gifts` 使用[独立兑换升级工具](../tools/redeem-migrate/migrate.ts)，操作方式和字段转换见[兑换升级文档](redeem-migration.md)。它保留旧领取对应的发放标识，并核对已有余额账本，避免重放已兑换奖励；不会读取或启用源面板原兑换码。两种来源不能混用。
 
 ## 套餐字段与金额单位
 
@@ -245,6 +276,7 @@ Mieru 支持 Mihomo（`format=clash`）和官方 `mierus://` 分享链接（`for
   "sourcePath": "/srv/migration/old-production.json",
   "passwordMethod": "auto",
   "includeNodes": false,
+  "includeAffiliate": false,
   "systemResetMethod": "1"
 }
 ```

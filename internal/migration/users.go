@@ -129,26 +129,13 @@ func (m *mapper) v2Users() {
 		if token := text(row, "token"); token != "" {
 			m.doc("subscriptions", "links", m.id("subscription", text(row, "id")), p.Record{"userId": id, "token": token, "createdAt": m.created(row, "created_at"), "source": m.ref(row, table)})
 		}
-		if parent := m.userID(row, "invite_user_id"); parent != "" {
-			m.doc("commerce", "referrals", id, p.Record{"userId": id, "parentId": parent, "createdAt": m.created(row, "created_at")})
+		discount := number(row, "discount")
+		if discount < 0 || discount > 100 {
+			m.fail("用户 %s 的折扣无效", text(row, "email"))
 		}
-		if amount := m.money(row, "commission_balance", false); amount != 0 {
-			m.doc("commerce", "commissions", m.id("opening-commission", text(row, "id")), p.Record{"userId": id, "amount": amount, "status": "available", "createdAt": m.S.ExportedAt, "source": m.ref(row, table)})
-		}
-		modeValue := text(row, "commission_type")
-		if modeValue == "" {
-			modeValue = "0"
-		}
-		mode := map[string]string{"0": "system", "1": "recurring", "2": "firstPurchase"}[modeValue]
-		if mode == "" {
-			m.fail("用户 %s 的返佣方式无法识别", text(row, "email"))
-		}
-		discount, commission := number(row, "discount"), number(row, "commission_rate")
-		if discount < 0 || discount > 100 || commission < 0 || commission > 100 {
-			m.fail("用户 %s 的折扣或返佣比例无效", text(row, "email"))
-		}
-		m.doc("commerce", "customers", id, p.Record{"userId": id, "discountPercent": discount, "commissionPercent": commission, "commissionMode": mode, "hasPriorPurchase": priorBuyers[text(row, "id")], "source": m.ref(row, table)})
+		m.doc("commerce", "customers", id, p.Record{"userId": id, "discountPercent": discount, "source": m.ref(row, table)})
 	}
+	m.v2Affiliate(rows, table, priorBuyers)
 }
 func (m *mapper) ssUsers() {
 	table, rows := m.table("user")
@@ -167,11 +154,8 @@ func (m *mapper) ssUsers() {
 		}
 		account := p.Record{"quotaGiB": number(row, "transfer_enable") / 1073741824, "groups": group, "allNodeGroups": truth(row, "is_admin"), "accessLevel": integer(row, "class"), "levelExpiresAt": m.timeValue(row, "class_expire"), "proxyPassword": text(row, "passwd"), "speedLimitMbps": integer(row, "node_speedlimit"), "deviceLimit": integer(row, "node_iplimit"), "expiresAt": m.timeValue(row, "expire_in"), "resetPolicy": m.ssResetPolicy(row)}
 		m.user(row, table, text(row, "pass"), account, m.money(row, "money", true))
-		if parent := m.userID(row, "ref_by"); parent != "" {
-			id := m.id("user", text(row, "id"))
-			m.doc("commerce", "referrals", id, p.Record{"userId": id, "parentId": parent, "createdAt": m.created(row, "reg_date")})
-		}
 	}
+	m.ssAffiliate(rows)
 	links, rows := m.table("link")
 	for _, row := range rows {
 		user := m.userID(row, "userid")

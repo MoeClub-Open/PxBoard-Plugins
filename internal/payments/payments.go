@@ -60,5 +60,16 @@ func (a *app) resolve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (a *app) view(r *http.Request) (p.View, error) {
-	return p.View{Title: "支付渠道", Resources: []p.Resource{{Key: "channels", Title: "支付渠道", Endpoint: "/channels", CreateLabel: "添加支付渠道", Editable: true, Deletable: true, Columns: []p.Field{c.Field("name", "名称", "text", false), c.Field("provider", "渠道", "tag", false), c.Field("enabled", "启用", "boolean", false), c.Field("webhookUrl", "回调地址", "link", false)}, Fields: []p.Field{c.Field("name", "渠道名称", "text", true), c.Select("provider", "渠道类型", "stripe|Stripe", "epay|易支付"), c.Field("apiKey", "支付密钥（修改时留空保留）", "password", false), c.Field("webhookSecret", "Stripe 回调签名密钥", "password", false), c.Field("merchantId", "易支付商户号", "text", false), c.Field("gatewayUrl", "易支付网关地址", "url", false), c.Field("publicUrl", "面板公开地址", "url", true), c.Field("enabled", "启用", "boolean", false)}}, {Key: "transactions", Title: "支付记录", Endpoint: "/transactions", Columns: []p.Field{c.Field("orderId", "订单 ID", "text", false), c.Field("amount", "金额", "money", false), c.Field("currency", "币种", "tag", false), c.Field("transactionId", "支付流水号", "copy", false), c.Field("statusLabel", "处理状态", "status", false), c.Field("message", "核对原因", "text", false), c.Field("resolution", "核对结果", "text", false), c.Field("createdAt", "时间", "datetime", false)}, Actions: []p.Action{{Key: "resolve", Label: "登记核对结果", Fields: []p.Field{c.Field("note", "处理结果", "text", true)}, When: map[string][]string{"status": {"needs_review"}}}}}}}, nil
+	channelFields := []p.Field{
+		c.Field("name", "渠道名称", "text", true),
+		c.Select("provider", "渠道类型", "stripe|Stripe", "epay|易支付"),
+		c.Field("apiKey", "支付密钥（修改时留空保留）", "password", false),
+		{Key: "webhookSecret", Label: "Stripe 回调签名密钥", Type: "password", When: map[string][]string{"provider": {"stripe"}}},
+		{Key: "merchantId", Label: "易支付商户号", Type: "text", When: map[string][]string{"provider": {"epay"}}},
+		{Key: "gatewayUrl", Label: "易支付网关地址", Type: "url", When: map[string][]string{"provider": {"epay"}}},
+		{Key: "paymentType", Label: "易支付付款方式", Type: "text", Default: "alipay", Hint: "填写网关支持的方式，如 alipay、wxpay；Linux DO Credit 使用 epay。", When: map[string][]string{"provider": {"epay"}}},
+		c.Field("publicUrl", "面板公开地址", "url", true),
+		c.Field("enabled", "启用", "boolean", false),
+	}
+	return p.View{Title: "支付渠道", Resources: []p.Resource{{Key: "channels", Title: "支付渠道", Endpoint: "/channels", CreateLabel: "添加支付渠道", Editable: true, Deletable: true, Columns: []p.Field{c.Field("name", "名称", "text", false), c.Field("provider", "渠道", "tag", false), c.Field("enabled", "启用", "boolean", false), c.Field("webhookUrl", "回调地址", "link", false)}, Fields: channelFields}, {Key: "transactions", Title: "支付记录", Endpoint: "/transactions", Columns: []p.Field{c.Field("orderId", "订单 ID", "text", false), c.Field("amount", "金额", "money", false), c.Field("currency", "币种", "tag", false), c.Field("transactionId", "支付流水号", "copy", false), c.Field("statusLabel", "处理状态", "status", false), c.Field("message", "核对原因", "text", false), c.Field("resolution", "核对结果", "text", false), c.Field("createdAt", "时间", "datetime", false)}, Actions: []p.Action{{Key: "resolve", Label: "登记核对结果", Fields: []p.Field{c.Field("note", "处理结果", "text", true)}, When: map[string][]string{"status": {"needs_review"}}}}}}}, nil
 }

@@ -66,16 +66,6 @@ func New() http.Handler {
 		}
 		return nil
 	})
-	a.CRUD(giftResource(), func(r *http.Request, b, old p.Record) error {
-		c.Defaults(b, old, p.Record{"code": p.ID(), "amount": 1000.0, "status": "unused"})
-		if p.Number(b, "amount") <= 0 || math.Trunc(p.Number(b, "amount")) != p.Number(b, "amount") {
-			return fmt.Errorf("金额须为正整数")
-		}
-		if old != nil && p.Text(old, "status") != "unused" {
-			return fmt.Errorf("已使用的充值卡不能修改")
-		}
-		return nil
-	})
 	a.Mux.HandleFunc("GET /orders", a.orders)
 	a.Mux.HandleFunc("GET /public/plans", a.publicPlans)
 	a.Mux.HandleFunc("POST /plans/{id}/details", func(w http.ResponseWriter, r *http.Request) {
@@ -95,31 +85,15 @@ func New() http.Handler {
 	a.Mux.HandleFunc("POST /orders/{id}/{action}", a.orderAction)
 	a.Mux.HandleFunc("GET /ledger", a.ledger)
 	a.Mux.HandleFunc("POST /ledger", a.adjust)
-	a.Mux.HandleFunc("POST /gifts/redeem", a.redeem)
-	a.Mux.HandleFunc("GET /referrals", a.referrals)
-	a.Mux.HandleFunc("GET /affiliate/summary", a.affiliateSummary)
-	a.Mux.HandleFunc("GET /withdrawals", a.withdrawals)
-	a.Mux.HandleFunc("POST /withdrawals", a.withdraw)
-	a.Mux.HandleFunc("POST /withdrawals/{id}/{action}", a.withdrawAction)
 	a.Mux.HandleFunc("GET /internal/orders/{id}", a.internalOrder)
-	a.Mux.HandleFunc("POST /register", a.register)
-	a.Mux.HandleFunc("GET /_capabilities", func(w http.ResponseWriter, r *http.Request) {
-		if !c.Require(w, r, "core") {
-			return
-		}
-		config, e := a.config()
-		if !c.Err(w, e) {
-			p.JSON(w, map[string]bool{"auth.registration": businessEnabled(config) && p.Bool(config, "registrationEnabled")})
-		}
-	})
-	a.Mux.HandleFunc("GET /settings", a.settings)
-	a.Mux.HandleFunc("PATCH /settings/{id}", a.settings)
-	a.View("settings", a.settingsView)
+	a.Mux.HandleFunc("GET /internal/orders", a.internalOrders)
+	a.Mux.HandleFunc("GET /internal/purchase-history/{userId}", a.internalPurchaseHistory)
+	a.Mux.HandleFunc("GET /internal/capabilities", a.internalCapabilities)
+	a.Mux.HandleFunc("POST /internal/wallet/credits", a.internalCredit)
 	a.View("plans", a.planView)
 	a.View("orders", a.orderView)
 	a.View("wallet", a.walletView)
-	a.View("marketing", a.marketingView)
-	a.View("referrals", a.referralView)
+	a.View("coupons", a.couponView)
 	a.Summary(func(r *http.Request) ([]p.Metric, error) {
 		rows, e := a.Filter("orders", func(row p.Record) bool { return c.Own(r, row) })
 		if e != nil {
@@ -163,7 +137,7 @@ func (a *app) event(e p.Event) error {
 	return nil
 }
 func (a *app) internalOrder(w http.ResponseWriter, r *http.Request) {
-	if !c.Require(w, r, "payments") {
+	if !c.Require(w, r, "payments", "affiliate") {
 		return
 	}
 	row, e := a.Find("orders", r.PathValue("id"))

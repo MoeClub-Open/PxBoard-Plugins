@@ -4,30 +4,47 @@
 
 | 插件 | 内容 |
 | --- | --- |
-| access | 访问权益、配额、周期流量 |
-| nodes | 节点、接入令牌、配置同步 |
+| branding | [站点名称、Logo、网站图标](docs/branding.md) |
+| registration | [账户注册与全局注册开关](docs/registration.md) |
+| access | [访问权益、配额、周期流量](docs/access-redeem.md) |
+| nodes | [节点、接入令牌、配置同步与状态监控](docs/noders-management.md) |
 | subscriptions | Clash、sing-box、通用订阅 |
-| sharing | 分享与邀请注册 |
-| commerce | 套餐、订单、余额、优惠、返佣 |
+| redeem | [访问权益与可选余额兑换码](docs/redeem.md) |
+| commerce | [套餐、订单、余额、价格优惠](docs/commerce.md) |
+| affiliate | [推广、佣金与提现](docs/affiliate.md) |
 | payments | Stripe 与易支付 |
 | audit | 流量审计、阻断与账户暂停 |
-| support | 工单、公告、文档与邮件 |
-| oauth | Google、GitHub、LinuxDO 登录与账号绑定 |
-| import-sspanel | 从 SSPanel 导入用户、权益、余额、套餐和订阅 |
-| import-v2board | 从 V2Board 导入用户、权益、余额、套餐和订阅 |
-| import-xboard | 从 Xboard 导入用户、权益、余额、套餐和订阅 |
+| support | [工单、公告、文档与邮件](docs/support.md) |
+| oauth | [Google、GitHub、LinuxDO 登录与账号绑定](docs/oauth.md) |
+| import-sspanel | [从 SSPanel 导入用户、权益、余额、套餐和订阅](docs/migration.md) |
+| import-v2board | [从 V2Board 导入用户、权益、余额、套餐和订阅](docs/migration.md) |
+| import-xboard | [从 Xboard 导入用户、权益、余额、套餐和订阅](docs/migration.md) |
 
 插件声明在 `plugins/<id>/manifest.json`。每个 `cmd/<id>` 仅导入该插件的业务包，自用产物不会包含商业插件。
 
-构建使用 Go 1.26 或更新版本；OAuth 插件要求核心 0.3.2+，其余插件的依赖以各自声明为准。第三方登录配置、账号绑定及独立手动搬入工具见 [OAuth 文档](docs/oauth.md)。
+构建使用 Go 1.26 或更新版本。本文所述功能组合要求核心 `0.4.0` 或更新版本，各插件的准确依赖以 `manifest.json` 为准。
 
 ```sh
 go build -o bin/nodes ./cmd/nodes
 go build -o bin/px-agent ./cmd/agent
 ```
 
-商业接口、金额与期限、订单重试及推广申请规则见[商业运营文档](docs/commerce.md)。完整功能边界、外部验证限制、节点接入方式见同级主仓库 `docs/`。批量发布由独立 `PxBoard-Registry` 仓库执行。
+## 安装与功能开关
 
-当前官方插件要求核心 0.3.0+；迁移插件支持读取只读 MySQL 数据库或由 `cmd/export-migration` 生成的完整快照。默认转换用户与套餐等主要数据，节点和机器可选；提交前提供预览与冲突检查，未转换的旧表保留归档。使用方法、字段单位、套餐核对及恢复操作见 [迁移文档](docs/migration.md)。
+模式决定默认安装组合，具体功能通过对应插件启用或停用。官方插件源的默认组合如下：
 
-访问与分享的开通重试、周期重置见 [访问与分享](docs/access-sharing.md)。邮件和工单通知见 [用户服务](docs/support.md)。认证下发节点本地配置及 Xboard 桥接见 [NodeRS 配置管理](docs/noders-management.md)。
+| 模式 | 默认插件 |
+| --- | --- |
+| 自用 | branding、nodes、subscriptions |
+| 公益 / 分享 | branding、registration、nodes、subscriptions、redeem、audit |
+| 商业 | branding、registration、nodes、subscriptions、commerce、payments、audit、support |
+
+依赖插件由安装器一并安装。推广插件在所有模式下均为可选，公益站点无需安装；商业模式也可按需安装兑换码或 OAuth。注册、兑换码和推广分别由独立插件提供，商业插件只负责套餐、订单、余额与价格优惠。停用插件会关闭对应入口和接口，已有业务数据保留。
+
+完整功能边界、模式与节点接入方式见同级主仓库 `docs/`。主项目、官方插件和官方插件源分别存放，批量发布由独立 `PxBoard-Registry` 仓库执行。
+
+## 数据迁移与升级
+
+迁移插件支持读取只读 MySQL 数据库或由 `cmd/export-migration` 生成的完整快照。默认转换用户与套餐等主要数据，节点和机器可选；提交前提供预览与冲突检查，未转换的旧表保留归档。使用方法、字段单位、套餐核对及恢复操作见 [迁移文档](docs/migration.md)。第三方客户端和 OAuth 数据不走面板导入插件，OAuth 的独立手动搬入工具见 [OAuth 文档](docs/oauth.md)。
+
+已有 PxBoard 的旧分享码、充值卡和兑换历史通过[兑换码数据升级](docs/redeem-migration.md)搬入独立兑换码插件；旧商业插件中的推广关系、佣金及提现记录通过[推广数据升级](docs/affiliate.md#从旧商业插件拆出数据)搬入独立推广插件。外部面板的原兑换码规则目前仅归档，不会自动激活。

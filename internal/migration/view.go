@@ -23,6 +23,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	title := map[string]string{"sspanel": "SSPanel", "v2board": "V2Board", "xboard": "Xboard"}[a.Source]
 	fields := []p.Field{c.Field("name", "任务名称", "text", true), c.Field("sourcePath", "快照文件路径（与数据库连接二选一）", "text", false), c.Field("dsn", "只读 MySQL 连接（与快照二选一）", "password", false), c.Field("sourceId", "来源标识（直接连接数据库时填写）", "text", false), {Key: "timezone", Label: "源数据库时区", Type: "text", Default: "Asia/Shanghai"}, {Key: "passwordMethod", Label: "旧密码算法", Type: "select", Default: "auto", Options: []p.Option{{Label: "自动识别编码密码 / 使用源字段", Value: "auto"}, {Label: "bcrypt", Value: "bcrypt"}, {Label: "Argon2id", Value: "argon2id"}, {Label: "Argon2i", Value: "argon2i"}, {Label: "MD5", Value: "md5"}, {Label: "MD5 + 盐", Value: "md5salt"}, {Label: "SHA256", Value: "sha256"}, {Label: "SHA256 + 盐", Value: "sha256salt"}, {Label: "SHA3-256 + 盐", Value: "sha3salt"}}}, c.Field("passwordSalt", "旧密码盐（使用带盐算法时填写）", "password", false)}
 	fields = append(fields, p.Field{Key: "includeNodes", Label: "同时导入节点和机器", Type: "boolean", Default: false})
+	fields = append(fields, p.Field{Key: "includeAffiliate", Label: "同时导入推广关系与佣金（需启用推广插件）", Type: "boolean", Default: false})
 	if a.Source != "sspanel" {
 		fields = append(fields, p.Field{Key: "systemResetMethod", Label: "源面板系统流量重置方式", Type: "select", Default: "auto", Options: []p.Option{{Label: "套餐各自指定（不跟随系统）", Value: "auto"}, {Label: "每月 1 日", Value: "0"}, {Label: "到期日按月重置", Value: "1"}, {Label: "不重置", Value: "2"}, {Label: "每年 1 月 1 日", Value: "3"}, {Label: "到期日按年重置", Value: "4"}}})
 	}

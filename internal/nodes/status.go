@@ -12,11 +12,19 @@ const heartbeatTimeout = 120 * time.Second
 
 func (a *app) monitoring() {
 	a.Mux.HandleFunc("GET /status", a.status)
-	a.View("status", a.statusView)
+	a.Mux.HandleFunc("GET /ui/status", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Member(w, r) || !a.requireUserStatus(w, r) {
+			return
+		}
+		view, e := a.statusView(r)
+		if !c.Err(w, e) {
+			p.JSON(w, view)
+		}
+	})
 }
 
 func (a *app) status(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
+	if !c.Member(w, r) || !a.requireUserStatus(w, r) {
 		return
 	}
 	nodes, e := a.C.List("nodes")

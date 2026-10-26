@@ -29,7 +29,9 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /bindings", a.bindings)
 	a.Mux.HandleFunc("DELETE /bindings/{id}", a.deleteBinding)
 	a.Mux.HandleFunc("POST /bindings/import", a.importBindings)
+	a.Mux.HandleFunc("GET /internal/registrations", a.registeredUsers)
 	a.View("providers", a.providerView)
+	a.Events(a.event)
 	return a
 }
 

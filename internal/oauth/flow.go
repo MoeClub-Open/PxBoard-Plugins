@@ -12,7 +12,7 @@ import (
 )
 
 func (a *app) authorize(w http.ResponseWriter, r *http.Request) {
-	var b struct{ ProviderID, Purpose, Proof, RedirectPath string }
+	var b struct{ ProviderID, Purpose, Proof, RedirectPath, Referral string }
 	if c.Err(w, p.Decode(r, &b)) {
 		return
 	}
@@ -32,7 +32,7 @@ func (a *app) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	state, verifier := p.ID()+p.ID(), oauth2.GenerateVerifier()
-	flow := p.Record{"id": state, "providerId": b.ProviderID, "purpose": b.Purpose, "proofDigest": digest(b.Proof), "verifier": verifier, "redirectPath": localPath(b.RedirectPath), "expiresAt": expiresAfter(10 * time.Minute), "providerVersion": provider["updatedAt"]}
+	flow := p.Record{"id": state, "providerId": b.ProviderID, "purpose": b.Purpose, "proofDigest": digest(b.Proof), "verifier": verifier, "redirectPath": localPath(b.RedirectPath), "expiresAt": expiresAfter(10 * time.Minute), "providerVersion": provider["updatedAt"], "referral": b.Referral}
 	if b.Purpose == "bind" {
 		flow["userId"] = p.Subject(r).ID
 	}
@@ -92,14 +92,14 @@ func (a *app) callback(w http.ResponseWriter, r *http.Request) {
 		redirectResult(w, r, provider, purpose, ticket, "")
 		return
 	}
-	userID, needsRegistration, e := a.loginIdentity(provider, profile)
+	userID, needsRegistration, e := a.loginIdentity(provider, profile, p.Text(flow, "referral"))
 	if e != nil {
 		redirectResult(w, r, provider, purpose, "", e.Error())
 		return
 	}
 	if needsRegistration {
 		ticket := p.ID() + p.ID()
-		row := p.Record{"id": ticket, "providerId": provider["id"], "providerVersion": provider["updatedAt"], "subject": profile.Subject, "displayName": profile.DisplayName, "proofDigest": flow["proofDigest"], "redirectPath": flow["redirectPath"], "expiresAt": expiresAfter(10 * time.Minute)}
+		row := p.Record{"id": ticket, "providerId": provider["id"], "providerVersion": provider["updatedAt"], "subject": profile.Subject, "displayName": profile.DisplayName, "proofDigest": flow["proofDigest"], "redirectPath": flow["redirectPath"], "expiresAt": expiresAfter(10 * time.Minute), "referral": flow["referral"]}
 		if c.Err(w, a.C.Put("pendingRegistrations", row)) {
 			return
 		}

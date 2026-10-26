@@ -3,6 +3,7 @@ package oauth
 import (
 	"crypto/subtle"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -23,22 +24,39 @@ func (a *app) bindingUser(providerID, subject string) (string, error) {
 	return "", nil
 }
 
-func (a *app) loginIdentity(provider p.Record, profile identity) (userID string, needsRegistration bool, err error) {
+func (a *app) registrationEnabled() bool {
+	var policy struct {
+		Enabled bool `json:"enabled"`
+	}
+	return a.C.Call("registration", "GET", "/internal/policy", nil, &policy) == nil && policy.Enabled
+}
+
+func (a *app) registrationAllowed(provider p.Record) bool {
+	return p.Bool(provider, "enabled") && p.Bool(provider, "allowRegistration") && a.registrationEnabled()
+}
+
+func (a *app) loginIdentity(provider p.Record, profile identity, referral string) (userID string, needsRegistration bool, err error) {
 	userID, err = a.bindingUser(p.Text(provider, "id"), profile.Subject)
 	if err != nil || userID != "" {
 		return userID, false, err
 	}
-	if !p.Bool(provider, "allowRegistration") {
+	if !a.registrationAllowed(provider) {
 		return "", false, fmt.Errorf("此第三方账号尚未绑定，请先登录已有账号并在账户页绑定")
 	}
 	if !profile.EmailVerified || !strings.Contains(profile.Email, "@") {
 		return "", true, nil
 	}
-	userID, err = a.registerIdentity(provider, profile, profile.Email, p.ID()+p.ID())
+	userID, err = a.registerIdentity(provider, profile, profile.Email, p.ID()+p.ID(), referral)
 	return userID, false, err
 }
 
-func (a *app) registerIdentity(provider p.Record, profile identity, email, password string) (string, error) {
+func (a *app) registerIdentity(provider p.Record, profile identity, email, password, referral string) (string, error) {
+	if user, e := a.bindingUser(p.Text(provider, "id"), profile.Subject); e != nil || user != "" {
+		return user, e
+	}
+	if !a.registrationAllowed(provider) {
+		return "", fmt.Errorf("新账号注册已关闭，请登录已有账号后绑定")
+	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !strings.Contains(email, "@") || len(password) < 10 {
 		return "", fmt.Errorf("请输入有效邮箱和至少 10 位密码")
@@ -52,12 +70,18 @@ func (a *app) registerIdentity(provider p.Record, profile identity, email, passw
 			return "", fmt.Errorf("该邮箱已有账号，请用原方式登录后绑定")
 		}
 	}
-	userID, e := a.C.CreateUserWithRecord(email, profile.DisplayName, password, "bindings", p.Record{
+	row := p.Record{
 		"id": bindingID(p.Text(provider, "id"), profile.Subject), "providerId": provider["id"],
 		"subject": profile.Subject, "displayName": profile.DisplayName, "createdAt": c.Now(),
-	})
+		"referral": referral, "registeredAt": c.Now(), "registrationPending": true,
+	}
+	userID, e := a.C.CreateUserWithRecord(email, profile.DisplayName, password, "bindings", row)
 	if e != nil {
 		return "", fmt.Errorf("无法创建账号，请稍后重试")
+	}
+	row["userId"] = userID
+	if e = a.PublishRegistration("bindings", row); e != nil {
+		log.Printf("oauth registration event pending: %v", e)
 	}
 	return userID, nil
 }
@@ -68,8 +92,15 @@ func (a *app) pendingRegistration(ticket, proof string) (row, provider p.Record,
 		return nil, nil, fmt.Errorf("注册请求无效或已到期，请重新登录")
 	}
 	provider, err = a.Find("providers", p.Text(row, "providerId"))
-	if err != nil || !p.Bool(provider, "enabled") || !p.Bool(provider, "allowRegistration") || p.Text(provider, "updatedAt") != p.Text(row, "providerVersion") {
+	if err != nil || !p.Bool(provider, "enabled") {
 		return nil, nil, fmt.Errorf("此登录服务的注册已关闭或配置已变更")
+	}
+	userID, err := a.bindingUser(p.Text(provider, "id"), p.Text(row, "subject"))
+	if err != nil {
+		return nil, nil, err
+	}
+	if userID == "" && (p.Text(provider, "updatedAt") != p.Text(row, "providerVersion") || !a.registrationAllowed(provider)) {
+		return nil, nil, fmt.Errorf("新账号注册已关闭，请登录已有账号后绑定")
 	}
 	return row, provider, nil
 }
@@ -101,7 +132,7 @@ func (a *app) completeRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if userID == "" {
-		userID, e = a.registerIdentity(provider, identity{Subject: p.Text(row, "subject"), DisplayName: p.Text(row, "displayName")}, b.Email, b.Password)
+		userID, e = a.registerIdentity(provider, identity{Subject: p.Text(row, "subject"), DisplayName: p.Text(row, "displayName")}, b.Email, b.Password, p.Text(row, "referral"))
 		if c.Err(w, e) {
 			return
 		}

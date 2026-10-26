@@ -158,7 +158,7 @@ func (a *app) suspend(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (a *app) clients(w http.ResponseWriter, r *http.Request) {
-	if !c.Require(w, r, "nodes", "subscriptions", "sharing") {
+	if !c.Require(w, r, "nodes", "subscriptions") {
 		return
 	}
 	rows, e := a.enrichedFor(r.URL.Query().Get("userId"))

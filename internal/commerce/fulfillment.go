@@ -35,9 +35,6 @@ func (a *app) fulfill(row p.Record) error {
 		if e := a.C.Call("access", "POST", "/internal/grant", grant, nil); e != nil {
 			return e
 		}
-		if e := a.commission(row); e != nil {
-			return e
-		}
 	}
 	row["status"] = "fulfilled"
 	row["fulfilledAt"] = c.Now()
@@ -48,7 +45,7 @@ func (a *app) fulfill(row p.Record) error {
 	return a.notifyFulfilled(row)
 }
 func (a *app) notifyFulfilled(row p.Record) error {
-	if e := a.C.Emit("order.fulfilled", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"]}); e != nil {
+	if e := a.C.Emit("order.fulfilled", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"], "kind": row["kind"], "paidAt": row["paidAt"], "fulfilledAt": row["fulfilledAt"]}); e != nil {
 		return e
 	}
 	row["notificationPending"] = false
@@ -65,18 +62,19 @@ func (a *app) refund(row p.Record) error {
 	if e := a.C.Put("ledger", p.Record{"id": "refund-" + p.Text(row, "id"), "userId": row["userId"], "amount": row["amount"], "reason": "订单退回余额", "orderId": row["id"], "createdAt": c.Now()}); e != nil {
 		return e
 	}
-	commissions, e := a.C.List("commissions")
-	if e != nil {
+	row["status"] = "refunded"
+	row["refundedAt"] = c.Now()
+	row["refundNotificationPending"] = true
+	if e := a.C.Put("orders", row); e != nil {
 		return e
 	}
-	for _, v := range commissions {
-		if v["orderId"] == row["id"] {
-			v["status"] = "reversed"
-			if e = a.C.Put("commissions", v); e != nil {
-				return e
-			}
-		}
+	return a.notifyRefunded(row)
+}
+
+func (a *app) notifyRefunded(row p.Record) error {
+	if e := a.C.Emit("order.refunded", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "refundedAt": row["refundedAt"]}); e != nil {
+		return e
 	}
-	row["status"] = "refunded"
+	row["refundNotificationPending"] = false
 	return a.C.Put("orders", row)
 }

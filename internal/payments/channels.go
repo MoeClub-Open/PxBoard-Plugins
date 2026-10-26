@@ -85,6 +85,10 @@ func (a *app) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p.Text(b, "provider") == "epay" {
+		b["paymentType"] = strings.TrimSpace(p.Text(b, "paymentType"))
+		if b["paymentType"] == "" {
+			b["paymentType"] = "alipay"
+		}
 		g, e := url.Parse(p.Text(b, "gatewayUrl"))
 		if e != nil || g.Scheme != "https" || g.Host == "" || g.User != nil || g.RawQuery != "" || g.Fragment != "" || p.Text(b, "merchantId") == "" {
 			p.Fail(w, 400, "请填写 HTTPS 支付网关与商户号")

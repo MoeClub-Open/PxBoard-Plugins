@@ -33,9 +33,6 @@ func couponResource() p.Resource {
 	f[5].Default = true
 	return p.Resource{Key: "coupons", Title: "优惠码", Endpoint: "/coupons", CreateLabel: "创建优惠码", Editable: true, Deletable: true, Fields: f, Columns: []p.Field{c.Field("code", "优惠码", "copy", false), c.Field("type", "优惠方式", "tag", false), c.Field("discount", "优惠额度", "number", false), c.Field("limit", "可用次数", "number", false), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}}
 }
-func giftResource() p.Resource {
-	return p.Resource{Key: "gifts", Title: "充值卡", Endpoint: "/gifts", CreateLabel: "创建充值卡", Fields: []p.Field{c.Field("amount", "金额", "money", true), c.Field("expiresAt", "到期时间", "datetime", false)}, Columns: []p.Field{c.Field("code", "兑换码", "copy", false), c.Field("amount", "金额", "money", false), c.Field("status", "状态", "status", false), c.Field("expiresAt", "到期时间", "datetime", false)}}
-}
 func (a *app) checkoutAction() *p.Action {
 	f := c.Field("channelId", "支付渠道", "select", true)
 	f.OptionsEndpoint = "/api/v1/extensions/payments/channels"
@@ -103,27 +100,12 @@ func (a *app) walletView(r *http.Request) (p.View, error) {
 	if checkout := a.checkoutAction(); checkout != nil {
 		actions = append(actions, *checkout)
 	}
-	return p.View{Title: "余额", Metrics: []p.Metric{{Label: "我的可用余额", Value: balance / 100, Unit: "元"}}, Resources: []p.Resource{res, {Key: "recharge", Title: "充值", Endpoint: "/orders?kind=recharge", CreateLabel: "余额充值", Fields: []p.Field{{Key: "kind", Label: "类型", Type: "hidden", Default: "recharge"}, c.Field("amount", "充值金额", "money", true)}, Columns: []p.Field{c.Field("number", "订单号", "text", false), c.Field("amount", "金额", "money", false), c.Field("status", "状态", "status", false)}, Actions: actions}, {Key: "redeem", Title: "充值卡", Endpoint: "/gifts/redeem", CreateLabel: "兑换充值卡", Fields: []p.Field{c.Field("code", "兑换码", "text", true)}, Columns: []p.Field{}}}}, nil
+	return p.View{Title: "余额", Metrics: []p.Metric{{Label: "我的可用余额", Value: balance / 100, Unit: "元"}}, Resources: []p.Resource{res, {Key: "recharge", Title: "充值", Endpoint: "/orders?kind=recharge", CreateLabel: "余额充值", Fields: []p.Field{{Key: "kind", Label: "类型", Type: "hidden", Default: "recharge"}, c.Field("amount", "充值金额", "money", true)}, Columns: []p.Field{c.Field("number", "订单号", "text", false), c.Field("amount", "金额", "money", false), c.Field("status", "状态", "status", false)}, Actions: actions}}}, nil
 }
-func (a *app) marketingView(r *http.Request) (p.View, error) {
+func (a *app) couponView(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
 		return p.View{}, problemPermission()
 	}
-	return p.View{Title: "优惠与充值卡", Resources: []p.Resource{couponResource(), giftResource()}}, nil
-}
-func (a *app) referralView(r *http.Request) (p.View, error) {
-	config, e := a.config()
-	if e != nil {
-		return p.View{}, e
-	}
-	sum, e := a.available(p.Subject(r).ID)
-	if e != nil {
-		return p.View{}, e
-	}
-	withdraw := p.Resource{Key: "withdrawals", Title: "佣金结算", Endpoint: "/withdrawals", CreateLabel: "申请结算", Fields: []p.Field{c.Field("amount", "申请金额", "money", true), c.Select("method", "结算方式", "wallet|转入余额", "cash|现金提现"), c.Field("payoutAccount", "收款账户（现金提现填写）", "text", false)}, Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("method", "方式", "tag", false), c.Field("payoutAccount", "收款账户", "text", false), c.Field("amount", "申请金额", "money", false), c.Field("status", "状态", "status", false), c.Field("createdAt", "申请时间", "datetime", false)}}
-	if p.Admin(r) {
-		withdraw.Actions = []p.Action{{Key: "paid", Label: "登记已打款", Confirm: "确认已经在外部完成打款？此操作只记录结果。", Fields: []p.Field{c.Field("reference", "打款流水号", "text", true)}, When: map[string][]string{"status": {"approved"}, "method": {"cash"}}}, {Key: "approve", Label: "通过", Confirm: "审批此结算申请？余额结算会直接入账，现金提现需要另行打款并登记流水。", When: map[string][]string{"status": {"pending", "approving"}}}, {Key: "reject", Label: "拒绝", Confirm: "拒绝此申请？", When: map[string][]string{"status": {"pending"}}}}
-	}
-	return p.View{Title: "推广返佣", Notice: "邀请链接：/register?ref=" + p.Subject(r).ID, Metrics: []p.Metric{{Label: "可用佣金", Value: sum / 100, Unit: "元"}, {Label: "返佣比例", Value: config["commissionPercent"], Unit: "%"}}, Resources: []p.Resource{{Key: "commissions", Title: "返佣记录", Endpoint: "/referrals", Columns: []p.Field{c.Field("orderId", "订单号", "text", false), c.Field("amount", "佣金", "money", false), c.Field("status", "状态", "status", false), c.Field("createdAt", "时间", "datetime", false)}}, withdraw}}, nil
+	return p.View{Title: "优惠码", Resources: []p.Resource{couponResource()}}, nil
 }
 func problemPermission() error { return fmt.Errorf("仅管理员可管理此功能") }

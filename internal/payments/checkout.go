@@ -78,7 +78,11 @@ func (a *app) checkout(w http.ResponseWriter, r *http.Request) {
 		}
 		redirect = result.URL
 	case "epay":
-		form := url.Values{"pid": {p.Text(channel, "merchantId")}, "type": {"alipay"}, "out_trade_no": {p.Text(order, "id")}, "notify_url": {base + "/api/v1/extensions/payments/webhooks/" + p.Text(channel, "id")}, "return_url": {base + "/user/orders"}, "name": {p.Text(order, "planName")}, "money": {fmt.Sprintf("%.2f", p.Number(order, "amount")/100)}}
+		paymentType := p.Text(channel, "paymentType")
+		if paymentType == "" {
+			paymentType = "alipay"
+		}
+		form := url.Values{"pid": {p.Text(channel, "merchantId")}, "type": {paymentType}, "out_trade_no": {p.Text(order, "id")}, "notify_url": {base + "/api/v1/extensions/payments/webhooks/" + p.Text(channel, "id")}, "return_url": {base + "/user/orders"}, "name": {p.Text(order, "planName")}, "money": {fmt.Sprintf("%.2f", p.Number(order, "amount")/100)}}
 		form.Set("sign", epaySign(form, p.Text(channel, "apiKey")))
 		form.Set("sign_type", "MD5")
 		redirect = strings.TrimSuffix(p.Text(channel, "gatewayUrl"), "/") + "/submit.php?" + form.Encode()
