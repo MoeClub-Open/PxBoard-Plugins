@@ -1,0 +1,70 @@
+{
+  "id": "sharing",
+  "publicPaths": [
+    "/redeem"
+  ],
+  "apiVersion": "1.0",
+  "name": "分享与邀请",
+  "permissions": [
+    "storage:own",
+    "users:create",
+    "call:access"
+  ],
+  "author": "PxBoard",
+  "category": "分享",
+  "version": "1.1.0",
+  "dependencies": {
+    "access": ">=1.1.0"
+  },
+  "homepage": "",
+  "description": "邀请注册、分享时限和独立流量额度",
+  "pages": [
+    {
+      "title": "分享与邀请",
+      "id": "sharing",
+      "icon": "gift",
+      "roles": [
+        "admin"
+      ],
+      "group": "连接"
+    }
+  ],
+  "auth": [
+    {
+      "key": "invite",
+      "query": {
+        "code": "code"
+      },
+      "path": "/redeem",
+      "title": "接受邀请",
+      "fields": [
+        {
+          "key": "name",
+          "type": "text",
+          "label": "姓名"
+        },
+        {
+          "key": "email",
+          "required": true,
+          "type": "email",
+          "label": "邮箱"
+        },
+        {
+          "key": "password",
+          "required": true,
+          "type": "password",
+          "label": "密码（至少 10 位）"
+        },
+        {
+          "key": "code",
+          "required": true,
+          "type": "text",
+          "label": "邀请码"
+        }
+      ],
+      "modes": [
+        "sharing"
+      ]
+    }
+  ]
+}

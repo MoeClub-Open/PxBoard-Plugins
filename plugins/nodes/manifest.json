@@ -1,0 +1,55 @@
+{
+  "id": "nodes",
+  "publicPaths": [
+    "/agent/sync",
+    "/machines"
+  ],
+  "apiVersion": "1.0",
+  "name": "节点管理",
+  "permissions": [
+    "storage:own",
+    "call:access",
+    "call:audit",
+    "emit:traffic.reported",
+    "emit:traffic.observed"
+  ],
+  "author": "PxBoard",
+  "category": "连接",
+  "version": "1.2.1",
+  "dependencies": {
+    "access": ">=1.1.0"
+  },
+  "homepage": "",
+  "description": "NodeRS 原生接入、节点配置、流量回报与状态监控",
+  "pages": [
+    {
+      "title": "节点管理",
+      "id": "nodes",
+      "icon": "server",
+      "roles": [
+        "admin"
+      ],
+      "group": "连接"
+    },
+    {
+      "title": "机器",
+      "id": "machines",
+      "icon": "server",
+      "roles": [
+        "admin"
+      ],
+      "group": "连接"
+    },
+    {
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "id": "status",
+      "group": "连接",
+      "icon": "server",
+      "title": "节点状态"
+    }
+  ],
+  "summary": true
+}

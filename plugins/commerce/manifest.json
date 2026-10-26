@@ -1,0 +1,132 @@
+{
+  "author": "PxBoard",
+  "version": "1.2.1",
+  "homepage": "",
+  "events": [
+    "payment.succeeded",
+    "system.tick",
+    "workspace.configured"
+  ],
+  "dependencies": {
+    "access": ">=1.2.1"
+  },
+  "id": "commerce",
+  "publicPaths": [
+    "/register",
+    "/public"
+  ],
+  "pages": [
+    {
+      "title": "套餐",
+      "id": "plans",
+      "icon": "shop",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "运营"
+    },
+    {
+      "title": "订单",
+      "id": "orders",
+      "icon": "receipt",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "运营"
+    },
+    {
+      "title": "余额",
+      "id": "wallet",
+      "icon": "wallet",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "运营"
+    },
+    {
+      "title": "优惠与充值卡",
+      "id": "marketing",
+      "icon": "gift",
+      "roles": [
+        "admin"
+      ],
+      "group": "运营"
+    },
+    {
+      "title": "推广返佣",
+      "id": "referrals",
+      "icon": "share",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "运营"
+    },
+    {
+      "group": "运营",
+      "roles": [
+        "admin"
+      ],
+      "id": "settings",
+      "icon": "shop",
+      "title": "运营设置"
+    }
+  ],
+  "permissions": [
+    "storage:own",
+    "users:read",
+    "users:create",
+    "call:access",
+    "call:payments",
+    "emit:order.fulfilled"
+  ],
+  "apiVersion": "1.0",
+  "description": "套餐、续费、流量加油包、订单、余额、优惠码、充值卡和推广返佣",
+  "category": "商业",
+  "name": "商业运营",
+  "summary": true,
+  "capabilities": [
+    "auth.registration"
+  ],
+  "auth": [
+    {
+      "key": "register",
+      "title": "注册",
+      "query": {
+        "referral": "ref"
+      },
+      "path": "/register",
+      "fields": [
+        {
+          "key": "name",
+          "type": "text",
+          "label": "姓名"
+        },
+        {
+          "key": "email",
+          "required": true,
+          "type": "email",
+          "label": "邮箱"
+        },
+        {
+          "key": "password",
+          "required": true,
+          "type": "password",
+          "label": "密码（至少 10 位）"
+        },
+        {
+          "key": "referral",
+          "type": "text",
+          "label": "邀请人（可选）"
+        }
+      ],
+      "capability": "auth.registration",
+      "modes": [
+        "business"
+      ]
+    }
+  ]
+}

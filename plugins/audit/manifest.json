@@ -1,0 +1,33 @@
+{
+  "id": "audit",
+  "events": [
+    "traffic.observed",
+    "system.tick"
+  ],
+  "apiVersion": "1.0",
+  "name": "流量审计",
+  "permissions": [
+    "storage:own",
+    "emit:access.suspend"
+  ],
+  "author": "PxBoard",
+  "category": "安全",
+  "version": "1.0.1",
+  "dependencies": {
+    "nodes": ">=1.0.0"
+  },
+  "homepage": "",
+  "description": "域名、关键词、正则、IP 网段和协议审计，支持阻断与暂停账户",
+  "pages": [
+    {
+      "title": "流量审计",
+      "id": "audit",
+      "icon": "shield",
+      "roles": [
+        "admin"
+      ],
+      "group": "安全"
+    }
+  ],
+  "summary": true
+}

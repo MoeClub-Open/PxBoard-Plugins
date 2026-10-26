@@ -1,0 +1,141 @@
+# 商业运营接口与规则
+
+`commerce` 提供套餐、订单、余额、优惠、推广佣金与提现申请。在线收款由 `payments` 提供，访问权益由 `access` 提供。以下规则对应官方插件 1.2.1。
+
+## 模式与注册
+
+商业模式安装所需插件后，核心发送 `workspace.configured`。商业插件据此保存当前工作空间模式；切换为自用或分享时，公开套餐和商业注册关闭，原有订单、余额和套餐数据保留。管理员仍可管理已安装的商业插件。
+
+从未通过工作空间配置启用的手工安装插件，按运营设置决定是否开放注册。注册表单只声明用于 `business` 模式。分享邀请由 `sharing` 的独立表单处理。
+
+运营设置包含开放注册、默认返佣比例、佣金冻结天数和“仅首次购买返佣”。已导入的个人折扣与明确的个人返佣规则优先于相应默认值。
+
+## 金额与期限
+
+接口金额均使用人民币整数分，例如 `999` 表示 9.99 元。前端提交订单后，以返回订单的实际 `amount` 作为支付金额。
+
+套餐使用以下期限字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `durationUnit=month` | `durationValue` 个日历月，月末不足时取当月最后一天 |
+| `durationUnit=day` | `durationValue` 天 |
+| `durationUnit=permanent` | 长期有效 |
+| `quotaGiB` | 每周期流量，单位 GB |
+| `unlimited` | 显式表达不限流量；额度为 0 不等于不限 |
+| `timezone` | 计算日历月使用的时区，普通新套餐默认 `UTC`，导入套餐保留源时区 |
+| `kind` | `subscription` 订阅、`time` 延长时间、`traffic` 流量加包、`reset` 重置用量 |
+
+未到期的订阅续费从现有到期日延长，已到期则从购买时延长。同一 `planFamilyId` 的周期套餐续费保留当前周期用量；更换套餐按新权益处理。套餐内的重置规则随权益下发，长期套餐可使用不自动重置规则。
+
+## 公开套餐
+
+无需登录：
+
+```http
+GET /api/v1/extensions/commerce/public/plans
+```
+
+只返回已上架套餐的展示字段：`id`、`name`、`description`、`price`、`currency`、`durationUnit`、`durationValue`、`quotaGiB`、`unlimited`、`kind`、`speedLimitMbps`、`deviceLimit`。不会返回迁移原记录、购买限制对象或内部来源信息。非商业工作空间返回空列表。
+
+公开接口不创建订单。购买需要用户先登录。
+
+## 创建与支付订单
+
+普通用户只为自己下单；管理员可以明确填写 `userId` 代建订单。
+
+```http
+POST /api/v1/extensions/commerce/orders
+Content-Type: application/json
+
+{
+  "planId": "套餐ID",
+  "coupon": "可选优惠码",
+  "requestId": "一次购买意图对应的唯一标识"
+}
+```
+
+充值订单使用 `kind=recharge` 和整数分 `amount`：
+
+```json
+{
+  "kind": "recharge",
+  "amount": 5000,
+  "requestId": "一次充值意图对应的唯一标识"
+}
+```
+
+同一用户用相同 `requestId` 重试相同内容时返回原订单。相同标识更改套餐、金额或优惠码时返回 `409`。用户修改输入应创建新的标识；网络失败且输入未变化时复用原标识。
+
+订单创建会计算有效优惠码与个人折扣，保留减免金额。个人折扣按套餐原价计算，最终应付最低为 0。订单保存购买时的套餐内容，后续修改套餐不会改变已有订单的权益。
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /orders` | 当前用户的订单；管理员可查看全站订单 |
+| `POST /orders/{id}/pay` | 使用余额支付套餐订单 |
+| `POST /orders/{id}/cancel` | 取消待支付订单 |
+| `POST /orders/{id}/confirm` | 管理员确认已人工收款 |
+| `POST /orders/{id}/refund` | 管理员将已完成套餐订单退回余额并撤回可撤回权益 |
+| `POST /api/v1/extensions/payments/checkout` | 在线渠道创建收银台，提交 `orderId` 与 `channelId` |
+
+充值需要在线渠道或管理员明确调整余额，不能用余额给余额充值。成功支付后依次写入已支付状态、开通权益并完成订单；中途失败会通过任务重试，权益和账本按业务标识避免重复写入。
+
+退款会检查较新的权益开通顺序，避免撤回较早订单时覆盖后来购买。充值余额的原渠道退款仍由管理员核对处理，不能把已花掉的充值直接从账户再次扣走。
+
+## 推广与佣金
+
+登录用户可读取严格属于自己的摘要，即使调用者是管理员，也不会混入其他用户的数据：
+
+```http
+GET /api/v1/extensions/commerce/affiliate/summary
+```
+
+返回字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `availableAmount` | 扣除有效提现申请后的可用佣金，整数分 |
+| `pendingAmount` | 尚在冻结的佣金，整数分 |
+| `totalAmount` | 当前系统有效累计佣金，排除撤回和纯历史记录 |
+| `invitedCount` | 当前用户推荐关系中的人数 |
+| `commissionPercent` | 当前用户实际使用的返佣比例 |
+| `commissionHoldDays` | 默认冻结天数 |
+| `commissionMode` | `firstPurchase` 或 `recurring` |
+| `referralPath` | 含已编码邀请人标识的相对注册链接 |
+
+佣金以已完成套餐订单金额计算。个人规则可以指定持续返佣或仅首次购买，否则跟随运营设置。导入保存的有效购买历史也参与首次购买判断，避免老用户迁移后再次被当成首次购买。充值订单不产生套餐推广佣金。
+
+累计金额表示当前系统已有的有效记录；迁移前没有可执行记录的历史流水不会凭空重建为新的佣金。
+
+## 佣金申请与撤回
+
+```http
+POST /api/v1/extensions/commerce/withdrawals
+Content-Type: application/json
+
+{
+  "amount": 5000,
+  "method": "wallet",
+  "requestId": "一次申请对应的唯一标识"
+}
+```
+
+`method=wallet` 表示申请转入站内余额，`method=cash` 表示申请外部打款，后者还需要 `payoutAccount`。两者都需要管理员审批，提交成功不代表已到账。最低申请 1 元，金额不能超过可用佣金。
+
+同一用户、相同 `requestId` 和相同申请内容返回原申请；更改金额、方式或收款账号时返回 `409`，应按新的申请意图重新生成标识。
+
+| 接口 | 权限与用途 |
+| --- | --- |
+| `GET /withdrawals` | 当前用户的申请；管理员可查看全站申请 |
+| `POST /withdrawals/{id}/cancel` | 仅本人可撤回仍为 `pending` 的申请 |
+| `POST /withdrawals/{id}/approve` | 管理员审批；余额申请入账一次，现金申请进入待打款状态 |
+| `POST /withdrawals/{id}/reject` | 管理员拒绝仍待审批的申请 |
+| `POST /withdrawals/{id}/paid` | 管理员确认现金打款并提交支付凭据 `reference` |
+
+待审批申请占用相应可用佣金，拒绝或撤回后释放。已审批或正在转账的申请不能由用户撤回。
+
+## 数据保留
+
+商业模式与自用、分享之间切换不会清空商业数据。停用插件会停止其业务处理；卸载插件保留核心业务记录。备份应包含完整核心数据目录，正式迁移前另行保留源系统完整数据库和配置备份。
+
+从旧面板导入的订单、支付配置、优惠和审计规则默认只保留原始记录。它们不会自动发起收款或重放权益，详见[迁移文档](migration.md)。

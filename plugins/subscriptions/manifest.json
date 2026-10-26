@@ -1,0 +1,35 @@
+{
+  "id": "subscriptions",
+  "publicPaths": [
+    "/s"
+  ],
+  "apiVersion": "1.0",
+  "name": "订阅与客户端",
+  "permissions": [
+    "storage:own",
+    "users:read",
+    "call:access",
+    "call:nodes"
+  ],
+  "author": "PxBoard",
+  "category": "连接",
+  "version": "1.1.0",
+  "dependencies": {
+    "access": ">=1.1.0",
+    "nodes": ">=1.0.0"
+  },
+  "homepage": "",
+  "description": "Clash、sing-box 和通用订阅，支持链接重置和二维码",
+  "pages": [
+    {
+      "title": "订阅与客户端",
+      "id": "subscriptions",
+      "icon": "link",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "连接"
+    }
+  ]
+}

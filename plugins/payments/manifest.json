@@ -1,0 +1,32 @@
+{
+  "id": "payments",
+  "publicPaths": [
+    "/webhooks"
+  ],
+  "apiVersion": "1.0",
+  "name": "支付网关",
+  "permissions": [
+    "storage:own",
+    "call:commerce",
+    "emit:payment.succeeded"
+  ],
+  "author": "PxBoard",
+  "category": "商业",
+  "version": "1.2.0",
+  "dependencies": {
+    "commerce": ">=1.0.0"
+  },
+  "homepage": "",
+  "description": "Stripe 与易支付收银台、回调签名校验和支付流水",
+  "pages": [
+    {
+      "title": "支付渠道",
+      "id": "payments",
+      "icon": "credit",
+      "roles": [
+        "admin"
+      ],
+      "group": "运营"
+    }
+  ]
+}

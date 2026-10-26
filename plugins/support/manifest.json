@@ -1,0 +1,56 @@
+{
+  "id": "support",
+  "events": [
+    "order.fulfilled",
+    "ticket.replied",
+    "auth.reset-requested",
+    "system.tick"
+  ],
+  "apiVersion": "1.0",
+  "name": "用户服务",
+  "permissions": [
+    "storage:own",
+    "users:read",
+    "emit:ticket.replied"
+  ],
+  "author": "PxBoard",
+  "category": "服务",
+  "version": "1.0.1",
+  "dependencies": {},
+  "homepage": "",
+  "description": "工单对话、公告、使用文档、邮件队列和密码找回通知",
+  "pages": [
+    {
+      "title": "工单",
+      "id": "tickets",
+      "icon": "message",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "服务"
+    },
+    {
+      "title": "公告与文档",
+      "id": "content",
+      "icon": "book",
+      "roles": [
+        "admin",
+        "member"
+      ],
+      "group": "服务"
+    },
+    {
+      "title": "邮件通知",
+      "id": "notifications",
+      "icon": "mail",
+      "roles": [
+        "admin"
+      ],
+      "group": "服务"
+    }
+  ],
+  "capabilities": [
+    "auth.password-reset"
+  ]
+}

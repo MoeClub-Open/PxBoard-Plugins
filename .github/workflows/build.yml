@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: PxBoard-Plugins
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: MoeClub-Open/PxBoard
+          ref: v0.2.0
+          path: PxBoard
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: PxBoard-Plugins/go.mod
+          cache-dependency-path: PxBoard-Plugins/go.sum
+      - name: Build official plugins
+        working-directory: PxBoard-Plugins
+        run: go build ./...
