@@ -2,7 +2,7 @@
 
 迁移插件将用户、现有访问权益、余额、套餐和订阅转换为 PxBoard 数据。未转换的旧表与原字段保留在迁移快照和归档中，不会作为新业务自动运行。
 
-要求 PxBoard 核心 0.4.0 或更新版本，迁移插件 1.3.0 或更新版本，`commerce` 1.4.0 或更新版本，`access`、`nodes` 1.3.0 或更新版本，`subscriptions` 1.2.0 或更新版本。插件接口版本为 `1.0`。
+要求 PxBoard 核心 0.4.0 或更新版本；Xboard / V2Board 多周期导入需要对应迁移插件 1.4.0 和 `commerce` 1.5.0 或更新版本。SSPanel 迁移插件需要 1.3.0 或更新版本，`access`、`nodes` 需要 1.3.0 或更新版本，`subscriptions` 需要 1.2.0 或更新版本。插件接口版本为 `1.0`。
 
 ## 安装与选择来源
 
@@ -180,14 +180,14 @@ node tools/migrate-commerce-affiliate.ts --database /srv/pxboard/data/pxboard.db
 
 | 来源字段 | 处理方式 |
 | --- | --- |
-| V2Board `month_price`、`quarter_price`、`year_price` 等 | 原值为整数分；按可用周期拆成独立套餐 |
-| Xboard `prices.monthly`、`prices.yearly` 等 | 原值为元；精确转换为整数分后按周期拆分 |
-| `onetime` / `onetime_price` | 长期套餐，`durationUnit=permanent` |
-| `reset_traffic` / `reset_price` | 保留为重置流量类型 |
+| V2Board `month_price`、`quarter_price`、`year_price` 等 | 原值为整数分；保留为同一套餐的可选周期 |
+| Xboard `prices.monthly`、`prices.yearly` 等 | 原值为元；精确转换为整数分，保留为同一套餐的可选周期 |
+| `onetime` / `onetime_price` | 长期选项，`durationUnit=permanent` |
+| `reset_traffic` / `reset_price` | 保留为同套餐的重置流量选项 |
 | SSPanel `price` | 原值为元，精确转为整数分 |
 | SSPanel `content` / `content_extra` 与 `limit` | 保存可识别的期限、流量、等级等字段，同时保留原完整内容与限制 |
 
-套餐期限采用 `durationUnit` 和 `durationValue`：`month` 表示日历月，`day` 表示天，`permanent` 表示长期。月付不会一律转成 30 天。原同套餐的各付费周期通过 `planFamilyId` 关联，便于保持续费后的账户权益。
+套餐通过 `periods` 保存多个选项，每个选项保留原周期标识、价格、销售和续费状态及对应的权益规则。期限采用 `durationUnit` 和 `durationValue`：`month` 表示日历月，`day` 表示天，`permanent` 表示长期。月付不会一律转成 30 天。导入保留原套餐的 `planFamilyId`，便于保持续费后的账户权益。已用旧版本拆分的套餐可使用[多周期套餐升级工具](plan-period-migration.md)合并；升级工具保留原始套餐归档，不更改已有订单和账户权益。
 
 V2Board / Xboard 的 `sell`（旧版无此字段时使用 `show`）、`show`、`renew` 分别对应 `enabled`、`visible`、`renewable`。原套餐和节点的排序值一并保留，订阅按节点排序输出。未提供续费开关的旧版默认允许续费；停售和隐藏不会阻止原套餐明确允许的续费。
 

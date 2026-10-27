@@ -34,7 +34,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		user = p.Text(b, "userId")
 	}
 	requestID := p.Text(b, "requestId")
-	intent := map[string]any{"planId": p.Text(b, "planId"), "kind": p.Text(b, "kind"), "amount": p.Number(b, "amount"), "coupon": strings.TrimSpace(p.Text(b, "coupon"))}
+	intent := map[string]any{"planId": p.Text(b, "planId"), "periodId": p.Text(b, "periodId"), "kind": p.Text(b, "kind"), "amount": p.Number(b, "amount"), "coupon": strings.TrimSpace(p.Text(b, "coupon"))}
 	if requestID != "" {
 		orders, e := a.records("orders", p.Record{"field": "userId", "value": user}, p.Record{"field": "requestId", "value": requestID})
 		if c.Err(w, e) {
@@ -42,7 +42,11 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, order := range orders {
 			if p.Text(order, "userId") == user && p.Text(order, "requestId") == requestID {
-				if !reflect.DeepEqual(order["request"], intent) {
+				previous, _ := order["request"].(map[string]any)
+				if previous != nil && previous["periodId"] == nil {
+					previous["periodId"] = ""
+				}
+				if !reflect.DeepEqual(previous, intent) {
 					p.Fail(w, 409, "购买内容已变化，请重新确认后下单")
 					return
 				}
@@ -67,7 +71,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		row["kind"] = "recharge"
 		row["planName"] = "余额充值"
 	} else {
-		plan, e := a.Find("plans", p.Text(b, "planId"))
+		plan, period, e := a.selectPeriod(p.Text(b, "planId"), p.Text(b, "periodId"))
 		if c.Err(w, e) {
 			return
 		}
@@ -75,16 +79,19 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		if c.Err(w, e) {
 			return
 		}
-		if !planAvailable(plan, account) {
+		if !periodAvailable(plan, period, account) {
 			p.Fail(w, 400, "此套餐暂不可购买或续费")
 			return
 		}
+		plan = periodPlan(plan, period)
 		if account == nil && c.Allowed(p.Text(plan, "kind"), "traffic", "reset", "time") {
 			p.Fail(w, 400, "请先购买基础套餐，再使用补充套餐")
 			return
 		}
 		row["planId"] = plan["id"]
-		row["planName"] = plan["name"]
+		row["periodId"] = period["id"]
+		row["periodLabel"] = periodLabel(period)
+		row["planName"] = p.Text(plan, "name") + " · " + periodLabel(period)
 		row["amount"] = plan["price"]
 		row["plan"] = plan
 		row["kind"] = plan["kind"]

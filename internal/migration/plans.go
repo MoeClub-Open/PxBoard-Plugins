@@ -16,7 +16,6 @@ func (m *mapper) v2Plans() {
 	table, rows := m.table("v2_plan")
 	for _, row := range rows {
 		prices := object(row, "prices")
-		converted := 0
 		yuan := len(prices) > 0
 		if !yuan {
 			for old, new := range legacyPeriods {
@@ -26,49 +25,47 @@ func (m *mapper) v2Plans() {
 			}
 		}
 		for period, value := range prices {
-			if value == nil {
-				continue
-			}
-			definition, ok := periods[period]
-			if !ok {
+			if _, ok := periods[period]; value != nil && !ok {
 				m.fail("套餐 %s 含未知计费周期 %s", text(row, "name"), period)
+			}
+		}
+		enabled := truth(row, "show")
+		if _, exists := row["sell"]; exists {
+			enabled = truth(row, "sell")
+		}
+		visible := row["show"] == nil || truth(row, "show")
+		renewable := row["renew"] == nil || truth(row, "renew")
+		review := integer(row, "capacity_limit") > 0
+		if review {
+			enabled = false
+			m.warning("套餐 %s 的限售规则已保留，核对后再开售", text(row, "name"))
+		}
+		options := []p.Record{}
+		for _, period := range []string{"monthly", "quarterly", "half_yearly", "yearly", "two_yearly", "three_yearly", "onetime", "reset_traffic"} {
+			value, ok := prices[period]
+			if !ok || value == nil {
 				continue
 			}
-			group := m.group(text(row, "group_id"))
-			id := m.id("plan", text(row, "id")+":"+period)
-			enabled := truth(row, "show")
-			if _, exists := row["sell"]; exists {
-				enabled = truth(row, "sell")
-			}
-			plan := p.Record{"name": text(row, "name") + " · " + definition.label, "price": m.money(Row{"price": value}, "price", yuan), "durationUnit": "month", "durationValue": definition.months, "quotaGiB": number(row, "transfer_enable"), "groups": group, "kind": definition.kind, "currency": "CNY", "enabled": enabled, "renew": row["renew"], "capacityLimit": integer(row, "capacity_limit"), "speedLimitMbps": integer(row, "speed_limit"), "deviceLimit": integer(row, "device_limit"), "source": m.ref(row, table), "sourcePeriod": period, "createdAt": m.created(row, "created_at")}
-			plan["unlimited"] = false
-			plan["visible"] = row["show"] == nil || truth(row, "show")
-			plan["renewable"] = row["renew"] == nil || truth(row, "renew")
-			plan["sort"] = integer(row, "sort")
-			plan["timezone"] = m.S.Timezone
-			plan["planFamilyId"] = m.id("plan-family", text(row, "id"))
-			plan["sourceContent"] = row
+			definition := periods[period]
+			option := p.Record{"id": m.id("plan", text(row, "id")+":"+period), "label": definition.label, "price": m.money(Row{"price": value}, "price", yuan), "durationUnit": "month", "durationValue": definition.months, "kind": definition.kind, "enabled": enabled, "visible": visible, "renewable": renewable, "reviewRequired": review}
 			if period == "onetime" {
-				plan["durationUnit"] = "permanent"
-				plan["durationValue"] = 0
-				plan["resetPolicy"] = p.Record{"type": "never"}
+				option["durationUnit"] = "permanent"
+				option["resetPolicy"] = p.Record{"type": "never"}
 			} else if period == "reset_traffic" {
-				plan["resetPolicy"] = p.Record{"type": "never"}
+				option["resetPolicy"] = p.Record{"type": "never"}
 			} else {
-				plan["resetPolicy"] = m.resetPolicy(row, Row{})
+				option["resetPolicy"] = m.resetPolicy(row, Row{})
 			}
-			if integer(row, "capacity_limit") > 0 {
-				plan["enabled"] = false
-				plan["reviewRequired"] = true
-				m.warning("套餐 %s 的限售规则已保留，核对后再开售", p.Text(plan, "name"))
-			}
-			m.doc("commerce", "plans", id, plan)
-			converted++
+			options = append(options, option)
 		}
-		if converted == 0 {
+		if len(options) == 0 {
 			m.doc("commerce", "plans", m.id("plan", text(row, "id")+":unpriced"), p.Record{"name": row["name"], "enabled": false, "reviewRequired": true, "sourceContent": row, "source": m.ref(row, table), "quotaGiB": number(row, "transfer_enable"), "groups": m.group(text(row, "group_id"))})
 			m.warning("套餐 %s 没有定价，已保留为停售套餐", text(row, "name"))
+			continue
 		}
+		first := options[0]
+		plan := p.Record{"name": text(row, "name"), "periods": options, "price": first["price"], "durationUnit": first["durationUnit"], "durationValue": first["durationValue"], "kind": first["kind"], "resetPolicy": first["resetPolicy"], "quotaGiB": number(row, "transfer_enable"), "groups": m.group(text(row, "group_id")), "currency": "CNY", "enabled": enabled, "visible": visible, "renewable": renewable, "reviewRequired": review, "renew": row["renew"], "capacityLimit": integer(row, "capacity_limit"), "speedLimitMbps": integer(row, "speed_limit"), "deviceLimit": integer(row, "device_limit"), "source": m.ref(row, table), "createdAt": m.created(row, "created_at"), "unlimited": false, "sort": integer(row, "sort"), "timezone": m.S.Timezone, "planFamilyId": m.id("plan-family", text(row, "id")), "sourceContent": row}
+		m.doc("commerce", "plans", p.Text(first, "id"), plan)
 	}
 }
 func (m *mapper) ssPlans() {

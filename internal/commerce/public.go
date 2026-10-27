@@ -22,7 +22,8 @@ func (a *app) publicPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []p.Record{}
 	for _, plan := range plans {
-		if !p.Bool(plan, "enabled") || plan["visible"] == false {
+		periods := availablePeriods(plan, nil)
+		if len(periods) == 0 {
 			continue
 		}
 		item := p.Record{}
@@ -31,19 +32,21 @@ func (a *app) publicPlans(w http.ResponseWriter, r *http.Request) {
 				item[key] = value
 			}
 		}
+		choices := []p.Record{}
+		for _, period := range periods {
+			choice := p.Record{"id": period["id"], "label": periodLabel(period)}
+			effective := periodPlan(plan, period)
+			for _, key := range []string{"price", "durationUnit", "durationValue", "kind"} {
+				if value, ok := effective[key]; ok {
+					choice[key] = value
+				}
+			}
+			choices = append(choices, choice)
+		}
+		item["periods"] = choices
 		out = append(out, item)
 	}
 	p.JSON(w, out)
-}
-
-func planAvailable(plan, account p.Record) bool {
-	if p.Bool(plan, "reviewRequired") {
-		return false
-	}
-	if family := p.Text(plan, "planFamilyId"); family != "" && family == p.Text(account, "planFamilyId") {
-		return plan["renewable"] != false
-	}
-	return p.Bool(plan, "enabled") && plan["visible"] != false
 }
 
 func (a *app) purchaseAccount(user string) (p.Record, error) {

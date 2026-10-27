@@ -1,14 +1,14 @@
 {
   "id": "import-v2board",
   "name": "从 V2Board 导入",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "apiVersion": "1.0",
   "description": "保留原密码、连接凭据、余额、流量和套餐信息，支持导入预览与冲突检查",
   "category": "迁移",
   "author": "PxBoard",
   "dependencies": {
     "subscriptions": ">=1.2.0",
-    "commerce": ">=1.4.0",
+    "commerce": ">=1.5.0",
     "access": ">=1.3.0"
   },
   "permissions": [

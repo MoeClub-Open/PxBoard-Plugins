@@ -10,9 +10,7 @@ import (
 func planResource() p.Resource {
 	fields := []p.Field{
 		c.Field("name", "套餐名称", "text", true),
-		{Key: "price", Label: "价格", Type: "money", Required: true, Default: 1000},
-		{Key: "durationUnit", Label: "期限单位", Type: "select", Default: "month", Options: []p.Option{{Label: "月", Value: "month"}, {Label: "天", Value: "day"}, {Label: "长期", Value: "permanent"}}},
-		{Key: "durationValue", Label: "期限数量", Type: "number", Default: 1},
+		{Key: "periods", Label: "购买周期与价格", Type: "periods", Required: true},
 		{Key: "quotaGiB", Label: "每周期流量（GB）", Type: "number", Default: 100},
 		c.Field("unlimited", "不限流量", "boolean", false),
 		{Key: "groups", Label: "可用节点分组", Type: "text", Required: true, Default: "default"},
@@ -20,9 +18,10 @@ func planResource() p.Resource {
 		c.Field("enabled", "上架", "boolean", false),
 		{Key: "visible", Label: "公开展示", Type: "boolean", Default: true},
 		{Key: "renewable", Label: "允许原套餐续费", Type: "boolean", Default: true},
+		c.Field("reviewRequired", "需要核对", "boolean", false),
 	}
 	return p.Resource{Key: "plans", Title: "套餐", Endpoint: "/plans", CreateLabel: "创建套餐", Editable: true, Deletable: true, Fields: fields, Columns: []p.Field{
-		c.Field("name", "套餐名称", "text", false), c.Field("price", "价格", "money", false), c.Field("durationValue", "期限数量", "number", false), c.Field("durationUnit", "期限单位", "tag", false), c.Field("quotaGiB", "周期流量", "gib", false), c.Field("unlimited", "不限流量", "boolean", false), c.Field("kind", "类型", "tag", false), c.Field("reviewRequired", "待核对", "boolean", false), c.Field("enabled", "可供新购", "boolean", false), c.Field("visible", "公开展示", "boolean", false), c.Field("renewable", "可续费", "boolean", false),
+		c.Field("name", "套餐名称", "text", false), c.Field("quotaGiB", "周期流量", "gib", false), c.Field("unlimited", "不限流量", "boolean", false), c.Field("kind", "类型", "tag", false), c.Field("reviewRequired", "待核对", "boolean", false), c.Field("enabled", "可供新购", "boolean", false), c.Field("visible", "公开展示", "boolean", false), c.Field("renewable", "可续费", "boolean", false),
 	}}
 }
 func couponResource() p.Resource {
@@ -45,21 +44,15 @@ func (a *app) planView(r *http.Request) (p.View, error) {
 		res.CreateLabel = ""
 		res.Editable = false
 		res.Deletable = false
-		res.Actions = []p.Action{{Key: "buy", Label: "购买", Endpoint: "/orders", Bind: map[string]string{"planId": "id"}, Fields: []p.Field{c.Field("coupon", "优惠码", "text", false)}}}
+		period := c.Field("periodId", "购买周期", "select", true)
+		period.OptionsEndpoint = "/api/v1/extensions/commerce/plans/{id}/period-options"
+		res.Actions = []p.Action{{Key: "buy", Label: "购买", Endpoint: "/orders", Bind: map[string]string{"planId": "id"}, Fields: []p.Field{period, c.Field("coupon", "优惠码", "text", false)}}}
 	}
 	return p.View{Title: "套餐", Resources: []p.Resource{res}}, nil
 }
 func (a *app) orderView(r *http.Request) (p.View, error) {
-	plans, e := a.C.List("plans")
-	if e != nil {
-		return p.View{}, e
-	}
-	f := c.Field("planId", "套餐", "select", true)
-	for _, plan := range plans {
-		if p.Bool(plan, "enabled") {
-			f.Options = append(f.Options, p.Option{Label: p.Text(plan, "name"), Value: plan["id"]})
-		}
-	}
+	f := c.Field("periodId", "套餐与周期", "select", true)
+	f.OptionsEndpoint = "/api/v1/extensions/commerce/period-options"
 	fields := []p.Field{f, c.Field("coupon", "优惠码", "text", false)}
 	if p.Admin(r) {
 		fields = append([]p.Field{c.UserField(a.C)}, fields...)

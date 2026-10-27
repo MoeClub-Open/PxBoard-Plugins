@@ -1,6 +1,6 @@
 {
   "author": "PxBoard",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "homepage": "",
   "events": [
     "payment.succeeded",
@@ -75,5 +75,5 @@
   "category": "商业",
   "name": "套餐与订单",
   "summary": true,
-  "minCoreVersion": "0.4.0"
+  "minCoreVersion": "0.4.9"
 }

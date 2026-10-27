@@ -15,7 +15,7 @@ type app struct{ *c.App }
 func New() http.Handler {
 	a := &app{c.New()}
 	a.CRUD(planResource(), func(r *http.Request, b, old p.Record) error {
-		c.Defaults(b, old, p.Record{"enabled": true, "visible": true, "renewable": true, "durationUnit": "month", "durationValue": 1.0, "timezone": "UTC", "quotaGiB": 100.0, "unlimited": false, "price": 1000.0, "groups": "default", "kind": "subscription", "currency": "CNY"})
+		c.Defaults(b, old, p.Record{"name": "", "enabled": true, "visible": true, "renewable": true, "reviewRequired": false, "durationUnit": "month", "durationValue": 1.0, "timezone": "UTC", "quotaGiB": 100.0, "unlimited": false, "price": 1000.0, "groups": "default", "kind": "subscription", "currency": "CNY"})
 		if p.Text(b, "planFamilyId") == "" {
 			family := p.Text(old, "planFamilyId")
 			if family == "" {
@@ -30,7 +30,9 @@ func New() http.Handler {
 		if e := c.Validate(b, "name", "groups"); e != nil {
 			return e
 		}
-		if p.Number(b, "price") < 0 || math.Trunc(p.Number(b, "price")) != p.Number(b, "price") || p.Number(b, "quotaGiB") < 0 {
+		_, newPeriods := b["periods"]
+		_, oldPeriods := old["periods"]
+		if (!newPeriods && !oldPeriods && !validPrice(b["price"])) || p.Number(b, "quotaGiB") < 0 {
 			return fmt.Errorf("价格须为非负整数，流量不能为负数")
 		}
 		if !c.Allowed(p.Text(b, "kind"), "subscription", "time", "traffic", "reset") || p.Text(b, "currency") != "CNY" {
@@ -39,19 +41,25 @@ func New() http.Handler {
 		if _, e := time.LoadLocation(p.Text(b, "timezone")); e != nil {
 			return fmt.Errorf("套餐时区无效")
 		}
-		if !c.Allowed(p.Text(b, "durationUnit"), "month", "day", "permanent") || p.Text(b, "durationUnit") != "permanent" && (p.Number(b, "durationValue") < 1 || math.Trunc(p.Number(b, "durationValue")) != p.Number(b, "durationValue")) {
+		if !newPeriods && !oldPeriods && (!c.Allowed(p.Text(b, "durationUnit"), "month", "day", "permanent") || p.Text(b, "durationUnit") != "permanent" && (p.Number(b, "durationValue") < 1 || math.Trunc(p.Number(b, "durationValue")) != p.Number(b, "durationValue"))) {
 			return fmt.Errorf("请输入有效的套餐期限")
 		}
-		if p.Bool(b, "enabled") {
-			b["reviewRequired"] = false
+		if err := normalizePeriods(b); err != nil {
+			return err
 		}
 		return nil
 	}, func(r *http.Request, row p.Record) bool {
-		if p.Admin(r) {
+		if p.Admin(r) && r.URL.Query().Get("scope") != "mine" {
+			row["periods"] = planPeriods(row)
 			return true
 		}
 		account, e := a.purchaseAccount(p.Subject(r).ID)
-		return e == nil && planAvailable(row, account)
+		if e != nil {
+			return false
+		}
+		periods := availablePeriods(row, account)
+		row["periods"] = periods
+		return len(periods) > 0
 	})
 	a.CRUD(couponResource(), func(r *http.Request, b, old p.Record) error {
 		c.Defaults(b, old, p.Record{"enabled": true, "limit": 100.0, "discount": 10.0, "type": "percent"})
@@ -68,6 +76,8 @@ func New() http.Handler {
 	})
 	a.Mux.HandleFunc("GET /orders", a.orders)
 	a.Mux.HandleFunc("GET /public/plans", a.publicPlans)
+	a.Mux.HandleFunc("GET /period-options", a.periodOptions)
+	a.Mux.HandleFunc("GET /plans/{id}/period-options", a.periodOptions)
 	a.Mux.HandleFunc("GET /public/currency", a.publicCurrency)
 	a.Mux.HandleFunc("GET /currency", a.currencySettings)
 	a.Mux.HandleFunc("PATCH /currency", a.currencySettings)
