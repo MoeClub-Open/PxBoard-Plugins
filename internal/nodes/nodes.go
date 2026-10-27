@@ -6,7 +6,6 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"net/http"
 	"reflect"
-	"time"
 )
 
 type app struct{ *c.App }
@@ -28,14 +27,11 @@ func New() http.Handler {
 			return nil, fmt.Errorf("无权查看节点概况")
 		}
 		rows, e := a.C.List("nodes")
-		online := 0
-		for _, row := range rows {
-			seen, err := time.Parse(time.RFC3339, p.Text(row, "lastSeen"))
-			if err == nil && time.Since(seen) < heartbeatTimeout {
-				online++
-			}
+		if e != nil {
+			return nil, e
 		}
-		return []p.Metric{{Label: "在线节点", Value: online}, {Label: "全部节点", Value: len(rows)}}, e
+		machines, e := a.C.List("machines")
+		return []p.Metric{{Label: "在线节点", Value: onlineCount(rows, machines)}, {Label: "全部节点", Value: len(primaryNodes(rows))}}, e
 	})
 	a.Mux.HandleFunc("POST /nodes/{id}/rotate", a.rotate)
 	a.Mux.HandleFunc("POST /agent/sync", a.sync)
@@ -119,13 +115,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		}
 	}
 	rows, e := a.C.List("nodes")
-	online := 0
-	for _, row := range rows {
-		if seen, err := time.Parse(time.RFC3339, p.Text(row, "lastSeen")); err == nil && time.Since(seen) < heartbeatTimeout {
-			online++
-		}
-	}
-	return p.View{Title: "节点管理", Metrics: []p.Metric{{Label: "全部节点", Value: len(rows)}, {Label: "在线节点", Value: online}}, Resources: []p.Resource{res, groupResource()}}, e
+	return p.View{Title: "节点管理", Metrics: []p.Metric{{Label: "全部节点", Value: len(primaryNodes(rows))}, {Label: "在线节点", Value: onlineCount(rows, machines)}, {Label: "连接地址", Value: len(rows)}}, Resources: []p.Resource{res, groupResource()}}, e
 }
 func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {
@@ -154,7 +144,9 @@ func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 		byID[p.Text(row, "id")] = row
 	}
 	for _, row := range rows {
-		if nodeVisible(row) && (p.Bool(row, "enabled") || p.Bool(byID[p.Text(row, "parentId")], "enabled")) {
+		parent := byID[p.Text(row, "parentId")]
+		if nodeVisible(row) && (p.Bool(row, "enabled") || p.Bool(parent, "enabled")) {
+			row = subscriptionNode(row, parent)
 			delete(row, "agentToken")
 			delete(row, "keyPath")
 			delete(row, "certPath")
@@ -162,6 +154,20 @@ func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p.JSON(w, out)
+}
+
+func subscriptionNode(node, parent p.Record) p.Record {
+	result := p.Record{}
+	for key, value := range node {
+		result[key] = value
+	}
+	if parent != nil && !p.Bool(node, "enabled") {
+		for _, key := range []string{"engine", "protocol", "passwordMode", "tls", "tlsMode", "serverName", "tlsSettings", "realitySettings", "protocolOptions", "transport", "transportSettings"} {
+			result[key] = parent[key]
+		}
+		result["parentAccess"] = p.Record{"groups": parent["groups"], "minimumAccessLevel": parent["minimumAccessLevel"], "allowedAccountIds": parent["allowedAccountIds"]}
+	}
+	return result
 }
 
 func nodeVisible(row p.Record) bool {

@@ -58,6 +58,7 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := []p.Record{}
+	serviceRows := map[string]int{}
 	byID := map[string]p.Record{}
 	for _, node := range nodes {
 		byID[p.Text(node, "id")] = node
@@ -72,7 +73,7 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 		if mine {
 			allowed := false
 			for _, account := range accounts {
-				if nodeVisible(node) && enabled && c.CanUse(account, node) {
+				if nodeVisible(node) && enabled && c.CanUse(account, node) && (p.Bool(node, "enabled") || parent == nil || c.CanUse(account, parent)) {
 					allowed = true
 					break
 				}
@@ -105,11 +106,56 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 			row = filterUserStatus(row, fields)
 		}
 		if parent != nil && admin && !mine {
+			if !p.Bool(node, "enabled") {
+				row["parentId"] = parent["id"]
+			}
 			row["parentName"] = parent["name"]
+		}
+		if mine {
+			serviceID := p.Text(telemetryNode, "id")
+			if index, exists := serviceRows[serviceID]; exists {
+				if p.Text(node, "id") == serviceID {
+					out[index] = row
+				}
+				continue
+			}
+			serviceRows[serviceID] = len(out)
 		}
 		out = append(out, row)
 	}
 	p.JSON(w, out)
+}
+
+func primaryNodes(nodes []p.Record) []p.Record {
+	byID := map[string]bool{}
+	for _, node := range nodes {
+		byID[p.Text(node, "id")] = true
+	}
+	primary := make([]p.Record, 0, len(nodes))
+	for _, node := range nodes {
+		if p.Bool(node, "enabled") || !byID[p.Text(node, "parentId")] {
+			primary = append(primary, node)
+		}
+	}
+	return primary
+}
+
+func onlineCount(nodes, machines []p.Record) int {
+	byNumber := map[float64]p.Record{}
+	for _, machine := range machines {
+		byNumber[p.Number(machine, "number")] = machine
+	}
+	online := 0
+	for _, node := range primaryNodes(nodes) {
+		var machine p.Record
+		if p.Text(node, "engine") == "noders" {
+			machine = byNumber[p.Number(node, "machineId")]
+		}
+		if p.Text(nodeStatus(node, machine, false), "status") == "online" {
+			online++
+		}
+	}
+	return online
 }
 
 func nodeStatus(node, machine p.Record, details bool) p.Record {

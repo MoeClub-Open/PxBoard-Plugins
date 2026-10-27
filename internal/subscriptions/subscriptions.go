@@ -85,7 +85,8 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	}
 	allowed := []p.Record{}
 	for _, n := range nodes {
-		if c.CanUse(account, n) {
+		parent, hasParent := n["parentAccess"].(map[string]any)
+		if c.CanUse(account, n) && (!hasParent || c.CanUse(account, p.Record(parent))) {
 			allowed = append(allowed, n)
 		}
 	}

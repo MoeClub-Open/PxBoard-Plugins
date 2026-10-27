@@ -14,7 +14,7 @@ import (
 func groupResource() p.Resource {
 	return p.Resource{Key: "groups", Title: "节点分组", Endpoint: "/groups", CreateLabel: "添加分组", Editable: true,
 		Fields:  []p.Field{c.Field("name", "分组名称", "text", true), {Key: "enabled", Label: "可用于新增选择", Type: "boolean", Default: true, Hint: "关闭后现有关联继续生效；默认分组始终可用"}},
-		Columns: []p.Field{c.Field("name", "分组名称", "text", false), c.Field("sourceId", "来源", "text", false), c.Field("nodeCount", "节点数", "number", false), c.Field("enabled", "可用于新增选择", "boolean", false)}}
+		Columns: []p.Field{c.Field("name", "分组名称", "text", false), c.Field("nodeCount", "节点数", "number", false), c.Field("enabled", "可用于新增选择", "boolean", false)}}
 }
 
 func splitGroups(value string) []string {
