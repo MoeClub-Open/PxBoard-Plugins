@@ -15,7 +15,7 @@
   ],
   "author": "PxBoard",
   "category": "服务",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "dependencies": {},
   "homepage": "",
   "description": "工单对话、公告、使用文档、邮件队列和密码找回通知",
@@ -53,5 +53,5 @@
   "capabilities": [
     "auth.password-reset"
   ],
-  "minCoreVersion": "0.3.0"
+  "minCoreVersion": "0.4.6"
 }

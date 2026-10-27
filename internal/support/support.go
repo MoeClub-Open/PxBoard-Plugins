@@ -23,6 +23,8 @@ func New() http.Handler {
 			return c.Validate(b, "title", "content")
 		}, func(r *http.Request, row p.Record) bool { return p.Admin(r) || p.Bool(row, "published") })
 	}
+	a.Mux.HandleFunc("POST /attachments", a.upload)
+	a.Mux.HandleFunc("GET /attachments/{id}", a.download)
 	a.Mux.HandleFunc("GET /tickets", a.tickets)
 	a.Mux.HandleFunc("POST /tickets", a.ticket)
 	a.Mux.HandleFunc("POST /tickets/{id}/{action}", a.ticketAction)
@@ -66,7 +68,11 @@ func (a *app) ticket(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, c.Validate(b, "subject", "content")) {
 		return
 	}
-	row := p.Record{"id": p.ID(), "userId": p.Subject(r).ID, "email": p.Subject(r).Email, "subject": b["subject"], "thread": p.Subject(r).Email + " · " + c.Now() + "\n" + p.Text(b, "content"), "status": "open", "createdAt": c.Now(), "updatedAt": c.Now()}
+	ids, err := a.validateAttachments(r, p.Text(b, "content"), nil)
+	if c.Err(w, err) {
+		return
+	}
+	row := p.Record{"id": p.ID(), "userId": p.Subject(r).ID, "email": p.Subject(r).Email, "subject": b["subject"], "messages": []p.Record{message(r, p.Text(b, "content"), ids)}, "status": "open", "createdAt": c.Now(), "updatedAt": c.Now()}
 	if !c.Err(w, a.C.Put("tickets", row)) {
 		p.JSON(w, row)
 	}
@@ -92,7 +98,12 @@ func (a *app) ticketAction(w http.ResponseWriter, r *http.Request) {
 		if c.Err(w, c.Validate(b, "message")) {
 			return
 		}
-		row["thread"] = p.Text(row, "thread") + "\n\n" + p.Subject(r).Email + " · " + c.Now() + "\n" + p.Text(b, "message")
+		ids, err := a.validateAttachments(r, p.Text(b, "message"), row)
+		if c.Err(w, err) {
+			return
+		}
+		messages, _ := row["messages"].([]any)
+		row["messages"] = append(messages, message(r, p.Text(b, "message"), ids))
 		if p.Admin(r) {
 			row["status"] = "answered"
 			pending, _ := row["pendingNotifications"].([]any)
