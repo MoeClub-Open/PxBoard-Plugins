@@ -1,16 +1,29 @@
 {
   "id": "branding",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.0",
+  "minCoreVersion": "0.4.13",
   "name": "站点品牌",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "统一站点名称、Logo 和网站图标",
   "category": "界面",
   "author": "PxBoard",
   "dependencies": {},
-  "permissions": ["storage:own"],
-  "publicPaths": ["/public"],
+  "permissions": [
+    "storage:own"
+  ],
+  "publicPaths": [
+    "/public"
+  ],
   "pages": [
-    {"id": "settings", "title": "品牌设置", "icon": "settings", "group": "系统", "roles": ["admin"]}
-  ]
+    {
+      "id": "settings",
+      "title": "品牌设置",
+      "icon": "settings",
+      "group": "系统",
+      "roles": [
+        "admin"
+      ]
+    }
+  ],
+  "versionEpoch": 1
 }

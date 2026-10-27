@@ -1,9 +1,9 @@
 {
   "id": "oauth",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.2",
+  "minCoreVersion": "0.4.13",
   "name": "第三方登录",
-  "version": "1.1.1",
+  "version": "0.0.1",
   "description": "Google、GitHub、LinuxDO 登录及账号绑定",
   "category": "账户",
   "author": "PxBoard",
@@ -16,7 +16,9 @@
     "call:registration",
     "emit:account.registered"
   ],
-  "events": ["system.tick"],
+  "events": [
+    "system.tick"
+  ],
   "publicPaths": [
     "/providers",
     "/authorize",
@@ -34,5 +36,6 @@
         "admin"
       ]
     }
-  ]
+  ],
+  "versionEpoch": 1
 }

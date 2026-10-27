@@ -14,10 +14,10 @@
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.5.0",
+  "version": "0.0.1",
   "dependencies": {
-    "access": ">=1.3.0",
-    "nodes": ">=1.5.0"
+    "access": ">=1!0.0.1",
+    "nodes": ">=1!0.0.1"
   },
   "homepage": "",
   "description": "Clash、sing-box 和通用订阅，支持链接重置和二维码",
@@ -33,5 +33,6 @@
       "group": "连接"
     }
   ],
-  "minCoreVersion": "0.4.12"
+  "minCoreVersion": "0.4.13",
+  "versionEpoch": 1
 }

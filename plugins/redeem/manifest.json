@@ -1,14 +1,14 @@
 {
   "id": "redeem",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.11",
+  "minCoreVersion": "0.4.13",
   "name": "兑换码",
-  "version": "1.0.1",
+  "version": "0.0.1",
   "description": "独立兑换码、访问权益与可选余额兑换",
   "category": "账户",
   "author": "PxBoard",
   "dependencies": {
-    "access": ">=1.4.0"
+    "access": ">=1!0.0.1"
   },
   "permissions": [
     "storage:own",
@@ -51,5 +51,6 @@
         "admin"
       ]
     }
-  ]
+  ],
+  "versionEpoch": 1
 }

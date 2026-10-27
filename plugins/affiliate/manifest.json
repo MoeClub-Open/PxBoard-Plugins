@@ -1,14 +1,14 @@
 {
   "id": "affiliate",
   "name": "推广返佣",
-  "version": "1.0.4",
+  "version": "0.0.1",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.1",
+  "minCoreVersion": "0.4.13",
   "description": "推荐关系、返佣规则、自助转入余额和现金提现审批",
   "category": "商业",
   "author": "PxBoard",
   "dependencies": {
-    "commerce": ">=1.4.0"
+    "commerce": ">=1!0.0.1"
   },
   "permissions": [
     "storage:own",
@@ -41,5 +41,6 @@
         "admin"
       ]
     }
-  ]
+  ],
+  "versionEpoch": 1
 }

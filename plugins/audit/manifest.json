@@ -12,9 +12,9 @@
   ],
   "author": "PxBoard",
   "category": "安全",
-  "version": "1.0.2",
+  "version": "0.0.1",
   "dependencies": {
-    "nodes": ">=1.0.0"
+    "nodes": ">=1!0.0.1"
   },
   "homepage": "",
   "description": "域名、关键词、正则、IP 网段和协议审计，支持阻断与暂停账户",
@@ -30,5 +30,6 @@
     }
   ],
   "summary": true,
-  "minCoreVersion": "0.3.0"
+  "minCoreVersion": "0.4.13",
+  "versionEpoch": 1
 }

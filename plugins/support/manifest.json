@@ -12,7 +12,7 @@
   ],
   "author": "PxBoard",
   "category": "服务",
-  "version": "1.3.0",
+  "version": "0.0.1",
   "dependencies": {},
   "homepage": "",
   "description": "工单对话、公告和使用文档",
@@ -38,7 +38,7 @@
       "group": "服务"
     }
   ],
-  "minCoreVersion": "0.4.11",
+  "minCoreVersion": "0.4.13",
   "migrationGuard": {
     "collections": [
       "mail",
@@ -54,5 +54,6 @@
     "message": "请先停止面板并使用 migrate-notifications.ts 迁移旧邮件配置和队列，再升级用户服务插件。",
     "beforeVersion": "1.3.0",
     "required": true
-  }
+  },
+  "versionEpoch": 1
 }
