@@ -15,9 +15,9 @@
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "dependencies": {
-    "access": ">=1.1.0"
+    "access": ">=1.4.2"
   },
   "homepage": "",
   "description": "NodeRS 原生接入、节点配置、面板迁移、流量回报与状态监控",
@@ -62,7 +62,7 @@
     }
   ],
   "summary": true,
-  "minCoreVersion": "0.4.0",
+  "minCoreVersion": "0.4.11",
   "capabilities": [
     "portal.status"
   ]

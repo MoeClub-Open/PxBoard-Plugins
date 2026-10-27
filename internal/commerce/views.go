@@ -13,7 +13,7 @@ func planResource() p.Resource {
 		{Key: "periods", Label: "购买周期与价格", Type: "periods", Required: true},
 		{Key: "quotaGiB", Label: "每周期流量（GB）", Type: "number", Default: 100},
 		c.Field("unlimited", "不限流量", "boolean", false),
-		{Key: "groups", Label: "可用节点分组", Type: "text", Required: true, Default: "default"},
+		{Key: "groups", Label: "可用节点分组", Type: "groups", Required: true, Default: "default", OptionsEndpoint: "/api/v1/extensions/nodes/groups/options"},
 		c.Select("kind", "套餐类型", "subscription|订阅 / 续费", "time|仅延长时间", "traffic|流量加油包", "reset|重置流量"),
 		c.Field("enabled", "上架", "boolean", false),
 		{Key: "visible", Label: "公开展示", Type: "boolean", Default: true},
@@ -21,7 +21,7 @@ func planResource() p.Resource {
 		c.Field("reviewRequired", "需要核对", "boolean", false),
 	}
 	return p.Resource{Key: "plans", Title: "套餐", Endpoint: "/plans", CreateLabel: "创建套餐", Editable: true, Deletable: true, Fields: fields, Columns: []p.Field{
-		c.Field("name", "套餐名称", "text", false), c.Field("quotaGiB", "周期流量", "gib", false), c.Field("unlimited", "不限流量", "boolean", false), c.Field("kind", "类型", "tag", false), c.Field("reviewRequired", "待核对", "boolean", false), c.Field("enabled", "可供新购", "boolean", false), c.Field("visible", "公开展示", "boolean", false), c.Field("renewable", "可续费", "boolean", false),
+		c.Field("name", "套餐名称", "text", false), c.Field("quotaGiB", "周期流量", "gib", false), c.Field("unlimited", "不限流量", "boolean", false), c.GroupField("groups", "节点分组", false), c.Field("kind", "类型", "tag", false), c.Field("reviewRequired", "待核对", "boolean", false), c.Field("enabled", "可供新购", "boolean", false), c.Field("visible", "公开展示", "boolean", false), c.Field("renewable", "可续费", "boolean", false),
 	}}
 }
 func couponResource() p.Resource {

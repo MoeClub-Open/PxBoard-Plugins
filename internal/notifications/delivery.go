@@ -1,4 +1,4 @@
-package support
+package notifications
 
 import (
 	"fmt"
@@ -13,16 +13,10 @@ import (
 
 func (a *app) event(e p.Event) error {
 	if e.Type == "system.tick" {
+		if e.Source != "core" {
+			return fmt.Errorf("通知事件来源无效")
+		}
 		a.startDelivery()
-		tickets, err := a.C.List("tickets")
-		if err != nil {
-			return err
-		}
-		for _, ticket := range tickets {
-			if err = a.flushTicketNotifications(ticket); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 	if e.Type == "auth.reset-requested" && e.Source != "core" || e.Type == "order.fulfilled" && e.Source != "commerce" || e.Type == "ticket.replied" && e.Source != "support" {
@@ -81,6 +75,11 @@ func (a *app) event(e p.Event) error {
 		expiresAt = createdAt.Add(30 * time.Minute).UTC().Format(time.RFC3339)
 		subject = "重置登录密码"
 		body = "请在 30 分钟内打开此链接重置密码：\n" + strings.TrimSuffix(p.Text(configs[0], "publicUrl"), "/") + "/reset?token=" + p.Text(e.Data, "token")
+	case "notification.requested":
+		subject, body = strings.TrimSpace(p.Text(e.Data, "subject")), p.Text(e.Data, "body")
+		if subject == "" || body == "" {
+			return fmt.Errorf("通知缺少主题或内容")
+		}
 	default:
 		return nil
 	}
@@ -88,22 +87,6 @@ func (a *app) event(e p.Event) error {
 		return err
 	}
 	a.startDelivery()
-	return nil
-}
-
-func (a *app) flushTicketNotifications(ticket p.Record) error {
-	pending, _ := ticket["pendingNotifications"].([]any)
-	for len(pending) > 0 {
-		data, _ := pending[0].(map[string]any)
-		if err := a.C.Emit("ticket.replied", p.Record(data)); err != nil {
-			return err
-		}
-		pending = pending[1:]
-		ticket["pendingNotifications"] = pending
-		if err := a.C.Put("tickets", ticket); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

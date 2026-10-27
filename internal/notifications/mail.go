@@ -1,4 +1,4 @@
-package support
+package notifications
 
 import (
 	"crypto/tls"

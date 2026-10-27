@@ -1,9 +1,6 @@
 {
   "id": "support",
   "events": [
-    "order.fulfilled",
-    "ticket.replied",
-    "auth.reset-requested",
     "system.tick"
   ],
   "apiVersion": "1.0",
@@ -15,10 +12,10 @@
   ],
   "author": "PxBoard",
   "category": "服务",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "dependencies": {},
   "homepage": "",
-  "description": "工单对话、公告、使用文档、邮件队列和密码找回通知",
+  "description": "工单对话、公告和使用文档",
   "pages": [
     {
       "title": "工单",
@@ -39,19 +36,23 @@
         "member"
       ],
       "group": "服务"
-    },
-    {
-      "title": "邮件通知",
-      "id": "notifications",
-      "icon": "mail",
-      "roles": [
-        "admin"
-      ],
-      "group": "服务"
     }
   ],
-  "capabilities": [
-    "auth.password-reset"
-  ],
-  "minCoreVersion": "0.4.6"
+  "minCoreVersion": "0.4.11",
+  "migrationGuard": {
+    "collections": [
+      "mail",
+      "notifications"
+    ],
+    "pendingEvents": [
+      "order.fulfilled",
+      "ticket.replied",
+      "auth.reset-requested"
+    ],
+    "markerCollection": "migrations",
+    "markerId": "notifications",
+    "message": "请先停止面板并使用 migrate-notifications.ts 迁移旧邮件配置和队列，再升级用户服务插件。",
+    "beforeVersion": "1.3.0",
+    "required": true
+  }
 }

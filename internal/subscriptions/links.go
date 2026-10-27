@@ -1,27 +1,17 @@
 package subscriptions
 
 import (
+	"errors"
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 func (a *app) queryLinks(filters []p.Record) ([]p.Record, error) {
-	rows := []p.Record{}
-	for {
-		var page struct {
-			Items []p.Record `json:"items"`
-			Total int        `json:"total"`
-		}
-		if e := a.C.Request("POST", "/api/v1/runtime/query", p.Record{"collection": "links", "filters": filters, "offset": len(rows), "limit": 1000}, &page); e != nil {
-			return nil, e
-		}
-		rows = append(rows, page.Items...)
-		if len(rows) >= page.Total || len(page.Items) == 0 {
-			return rows, nil
-		}
-	}
+	return a.QueryAll("links", filters...)
 }
 
 func (a *app) create(w http.ResponseWriter, r *http.Request) {
@@ -29,11 +19,12 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := p.Subject(r).ID
+	var b p.Record
+	if err := p.Decode(r, &b); err != nil && !errors.Is(err, io.EOF) {
+		p.Fail(w, 400, "请求格式无效")
+		return
+	}
 	if p.Admin(r) {
-		var b p.Record
-		if c.Err(w, p.Decode(r, &b)) {
-			return
-		}
 		if p.Text(b, "userId") != "" {
 			user = p.Text(b, "userId")
 		}
@@ -46,17 +37,22 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "用户还没有可用访问账户")
 		return
 	}
-	rows, e := a.queryLinks([]p.Record{{"field": "userId", "value": user}})
-	if c.Err(w, e) {
-		return
+	bind := false
+	if value, exists := b["bindUserAgent"]; exists {
+		var ok bool
+		bind, ok = value.(bool)
+		if !ok {
+			p.Fail(w, 400, "客户端绑定设置无效")
+			return
+		}
 	}
-	if len(rows) > 0 {
-		p.Fail(w, 409, "此用户已经有订阅链接")
-		return
+	name := strings.TrimSpace(p.Text(b, "name"))
+	if name == "" {
+		name = "订阅链接"
 	}
-	b := p.Record{"userId": user, "token": p.ID() + p.ID(), "createdAt": c.Now()}
-	if !c.Err(w, a.C.Put("links", b)) {
-		p.JSON(w, b)
+	row := p.Record{"userId": user, "name": name, "bindUserAgent": bind, "token": p.ID() + p.ID(), "createdAt": c.Now()}
+	if !c.Err(w, a.C.Put("links", row)) {
+		p.JSON(w, p.Record{"id": row["id"]})
 	}
 }
 
@@ -89,6 +85,10 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 		row["verified"] = verified(row, policy)
 		delete(row, "verificationVersion")
 		row["email"] = emails[p.Text(row, "userId")]
+		if p.Bool(policy, "enabled") && !p.Bool(row, "verified") {
+			delete(row, "token")
+			continue
+		}
 		base := "/api/v1/extensions/subscriptions/s/" + url.PathEscape(p.Text(row, "token"))
 		row["clashUrl"] = base + "?format=clash"
 		row["singboxUrl"] = base + "?format=sing-box"
@@ -116,7 +116,32 @@ func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
 	}
 	row["token"] = p.ID() + p.ID()
 	delete(row, "verificationVersion")
+	delete(row, "boundUserAgent")
+	delete(row, "boundClient")
+	delete(row, "boundMajor")
+	delete(row, "boundAt")
 	if !c.Err(w, a.C.Put("links", row)) {
+		p.JSON(w, true)
+	}
+}
+
+func (a *app) deleteLink(w http.ResponseWriter, r *http.Request) {
+	if !c.Member(w, r) {
+		return
+	}
+	rows, err := a.queryLinks([]p.Record{{"field": "id", "value": r.PathValue("id")}})
+	if c.Err(w, err) {
+		return
+	}
+	if len(rows) == 0 {
+		p.Fail(w, 404, "订阅链接不存在")
+		return
+	}
+	if !c.Own(r, rows[0]) {
+		p.Fail(w, 403, "无权删除此订阅")
+		return
+	}
+	if !c.Err(w, a.C.Delete("links", p.Text(rows[0], "id"))) {
 		p.JSON(w, true)
 	}
 }

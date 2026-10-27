@@ -16,6 +16,10 @@ func New() http.Handler {
 	a.machineAPI()
 	a.monitoring()
 	a.settingsAPI()
+	a.Mux.HandleFunc("GET /groups", a.groups)
+	a.Mux.HandleFunc("POST /groups", a.groups)
+	a.Mux.HandleFunc("PATCH /groups/{id}", a.groups)
+	a.Mux.HandleFunc("GET /groups/options", a.groupOptions)
 	res := resource()
 	a.CRUD(res, a.normalize)
 	a.View("nodes", a.view)
@@ -121,7 +125,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 			online++
 		}
 	}
-	return p.View{Title: "节点管理", Metrics: []p.Metric{{Label: "全部节点", Value: len(rows)}, {Label: "在线节点", Value: online}}, Resources: []p.Resource{res}}, e
+	return p.View{Title: "节点管理", Metrics: []p.Metric{{Label: "全部节点", Value: len(rows)}, {Label: "在线节点", Value: online}}, Resources: []p.Resource{res, groupResource()}}, e
 }
 func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {

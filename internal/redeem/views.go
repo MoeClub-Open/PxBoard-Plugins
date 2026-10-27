@@ -30,7 +30,7 @@ func (a *app) codesView(r *http.Request) (p.View, error) {
 		{Key: "durationUnit", Label: "期限单位", Type: "select", Required: true, Default: "day", Options: []p.Option{{Label: "天", Value: "day"}, {Label: "日历月", Value: "month"}, {Label: "长期", Value: "permanent"}}, When: map[string][]string{"kind": {"access", "time"}}},
 		{Key: "durationValue", Label: "期限", Type: "number", Required: true, Default: 30, When: map[string][]string{"kind": {"access", "time"}, "durationUnit": {"day", "month"}}},
 		{Key: "quotaGiB", Label: "流量（GB）", Type: "number", Required: true, Default: 20, When: map[string][]string{"kind": {"access", "traffic"}}},
-		{Key: "groups", Label: "节点分组", Type: "text", Required: true, Default: "default", When: map[string][]string{"kind": {"access"}}},
+		{Key: "groups", Label: "节点分组", Type: "groups", Required: true, Default: "default", OptionsEndpoint: "/api/v1/extensions/nodes/groups/options", When: map[string][]string{"kind": {"access"}}},
 		{Key: "limit", Label: "总可兑换次数（0为不限）", Type: "number", Required: true, Default: 1},
 		{Key: "perUserLimit", Label: "每个账号可兑换次数（0为不限）", Type: "number", Required: true, Default: 1},
 		c.Field("expiresAt", "兑换码到期时间", "datetime", false),

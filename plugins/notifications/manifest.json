@@ -1,0 +1,17 @@
+{
+  "id": "notifications",
+  "name": "邮件通知",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "minCoreVersion": "0.4.11",
+  "description": "邮件投递、密码找回和业务通知",
+  "category": "服务",
+  "author": "PxBoard",
+  "dependencies": {},
+  "permissions": ["storage:own", "users:read"],
+  "events": ["order.fulfilled", "ticket.replied", "auth.reset-requested", "notification.requested", "system.tick"],
+  "capabilities": ["auth.password-reset"],
+  "pages": [
+    {"id": "notifications", "title": "邮件通知", "icon": "mail", "group": "服务", "roles": ["admin"]}
+  ]
+}

@@ -24,14 +24,14 @@ func resource() p.Resource {
 	}
 	fields = append(fields, certificateFields()...)
 	fields = append(fields,
-		c.Field("groups", "节点分组（逗号分隔）", "text", true),
+		c.GroupField("groups", "节点分组", true),
 		c.Field("trafficRate", "流量倍率", "number", true),
 		p.Field{Key: "visible", Label: "在订阅中显示", Type: "boolean", Default: true},
 		c.Field("enabled", "启用服务", "boolean", false),
 	)
 	return p.Resource{
 		Key: "nodes", Title: "节点", Endpoint: "/nodes", CreateLabel: "添加节点", Editable: true, Deletable: true,
-		Columns: []p.Field{c.Field("name", "节点名称", "text", false), c.Field("region", "地区", "text", false), c.Field("host", "服务器", "text", false), c.Field("protocol", "协议", "tag", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("error", "运行错误", "text", false), c.Field("visible", "订阅显示", "boolean", false), c.Field("enabled", "服务启用", "boolean", false)},
+		Columns: []p.Field{c.Field("name", "节点名称", "text", false), c.Field("region", "地区", "text", false), c.Field("host", "服务器", "text", false), c.GroupField("groups", "节点分组", false), c.Field("protocol", "协议", "tag", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("error", "运行错误", "text", false), c.Field("visible", "订阅显示", "boolean", false), c.Field("enabled", "服务启用", "boolean", false)},
 		Fields:  fields, Actions: []p.Action{{Key: "rotate", Label: "接入令牌", Confirm: "生成新的节点接入令牌？原令牌会立即失效。"}},
 	}
 }

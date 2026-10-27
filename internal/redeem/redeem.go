@@ -54,17 +54,7 @@ func object(value any) p.Record {
 }
 
 func (a *app) all(collection string, filters ...p.Record) ([]p.Record, error) {
-	rows := []p.Record{}
-	for offset := 0; ; offset += 500 {
-		result, err := a.query(collection, offset, 500, filters...)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, result.Items...)
-		if len(result.Items) == 0 || len(rows) >= result.Total {
-			return rows, nil
-		}
-	}
+	return a.QueryAll(collection, filters...)
 }
 
 func (a *app) find(collection, field, value string) (p.Record, error) {

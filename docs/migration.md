@@ -231,6 +231,19 @@ Mieru 支持 Mihomo（`format=clash`）和官方 `mierus://` 分享链接（`for
 
 订阅同时保留已识别的 Reality 公钥和短 ID、TLS 域名和验证设置、WS / gRPC / HTTPUpgrade / h2 连接参数，以及 Hysteria 2 混淆和 TUIC 连接选项。XHTTP 支持 Mihomo 与通用链接，sing-box 订阅会跳过该传输。TUIC v4 无法当作 v5 使用，节点导入遇到 v4 会阻断。
 
+## 恢复已导入的节点分组名称
+
+新版迁移插件会建立来源分组名称，原有分组标识和关联保持不变。之前已导入的站点可使用 `tools/migrate-node-groups.ts` 从已保存的原始归档恢复名称；无法找到原名的分组显示来源和编号。原站未指定分组的账户保留原关系，不会自动分配节点。
+
+使用 Node.js 24 或更新版本，在停止面板服务后先预览，再按需写入：
+
+```sh
+node tools/migrate-node-groups.ts --database /绝对路径/pxboard.db
+node tools/migrate-node-groups.ts --database /绝对路径/pxboard.db --apply
+```
+
+工具在数据库旁创建独立备份，只补充缺失的分组记录，不覆盖已有名称，也不修改账户、节点、套餐或订单。多次执行不会重复创建。完成后启动面板并核对分组；迁移前仍应按部署流程备份完整数据目录。
+
 ## 快照与归档格式
 
 快照包含来源、导出时间、时区及各表的列描述和原始记录：

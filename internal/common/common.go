@@ -80,6 +80,24 @@ func (a *App) Filter(collection string, keep func(p.Record) bool) ([]p.Record, e
 	}
 	return out, nil
 }
+
+// QueryAll reads every page using the same filtering and pagination contract.
+func (a *App) QueryAll(collection string, filters ...p.Record) ([]p.Record, error) {
+	rows := []p.Record{}
+	for {
+		var page struct {
+			Items []p.Record `json:"items"`
+			Total int        `json:"total"`
+		}
+		if err := a.C.Request("POST", "/api/v1/runtime/query", p.Record{"collection": collection, "filters": filters, "offset": len(rows), "limit": 1000}, &page); err != nil {
+			return nil, err
+		}
+		rows = append(rows, page.Items...)
+		if len(rows) >= page.Total || len(page.Items) == 0 {
+			return rows, nil
+		}
+	}
+}
 func (a *App) CRUD(resource p.Resource, normalize func(*http.Request, p.Record, p.Record) error, read ...func(*http.Request, p.Record) bool) {
 	path := resource.Endpoint
 	collection := resource.Key
@@ -188,6 +206,9 @@ func (a *App) Events(fn func(p.Event) error) {
 }
 func Field(key, label, kind string, required bool) p.Field {
 	return p.Field{Key: key, Label: label, Type: kind, Required: required}
+}
+func GroupField(key, label string, required bool) p.Field {
+	return p.Field{Key: key, Label: label, Type: "groups", Required: required, OptionsEndpoint: "/api/v1/extensions/nodes/groups/options"}
 }
 func Select(key, label string, options ...string) p.Field {
 	f := Field(key, label, "select", true)

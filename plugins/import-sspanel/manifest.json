@@ -1,7 +1,7 @@
 {
   "id": "import-sspanel",
   "name": "从 SSPanel 导入",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "apiVersion": "1.0",
   "description": "保留原密码、连接凭据、余额、流量和套餐信息，支持导入预览与冲突检查",
   "category": "迁移",
@@ -9,7 +9,8 @@
   "dependencies": {
     "subscriptions": ">=1.2.0",
     "commerce": ">=1.4.0",
-    "access": ">=1.3.0"
+    "access": ">=1.3.0",
+    "nodes": ">=1.5.0"
   },
   "permissions": [
     "storage:own",
@@ -30,8 +31,12 @@
       "icon": "database",
       "title": "SSPanel",
       "id": "migration",
-      "shared": {"id": "migration", "title": "数据迁移", "selectorLabel": "来源面板"}
+      "shared": {
+        "id": "migration",
+        "title": "数据迁移",
+        "selectorLabel": "来源面板"
+      }
     }
   ],
-  "minCoreVersion": "0.4.10"
+  "minCoreVersion": "0.4.11"
 }

@@ -18,11 +18,12 @@ import (
 type app struct{ *c.App }
 
 func New() http.Handler {
-	a := &app{c.New()}
+	a := &app{App: c.New()}
 	a.View("subscriptions", a.view)
 	a.Mux.HandleFunc("GET /links", a.links)
 	a.Mux.HandleFunc("POST /links", a.create)
 	a.Mux.HandleFunc("POST /links/{id}/rotate", a.rotate)
+	a.Mux.HandleFunc("DELETE /links/{id}", a.deleteLink)
 	a.Mux.HandleFunc("POST /links/{id}/verify", a.verifyLink)
 	a.Mux.HandleFunc("GET /verification", a.verificationSettings)
 	a.Mux.HandleFunc("PATCH /verification", a.verificationSettings)
@@ -42,6 +43,10 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	link := rows[0]
+	client, major, ok := a.checkClient(w, r, link)
+	if !ok {
+		return
+	}
 	policy, e := a.verificationPolicy()
 	if c.Err(w, e) {
 		return
@@ -112,6 +117,9 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	}
 	allowed = sortedNodes(compatible)
 	uuid := p.Text(account, "credential")
+	var data []byte
+	var err error
+	var contentType string
 	switch format {
 	case "clash":
 		proxies := []any{}
@@ -125,13 +133,8 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 			names = []string{"DIRECT"}
 		}
 		config := map[string]any{"proxies": proxies, "proxy-groups": []any{map[string]any{"name": "代理选择", "type": "select", "proxies": names}}, "rules": []string{"MATCH,代理选择"}}
-		data, err := yaml.Marshal(config)
-		if err != nil {
-			p.Fail(w, 500, "订阅生成失败")
-			return
-		}
-		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
-		_, _ = w.Write(data)
+		data, err = yaml.Marshal(config)
+		contentType = "text/yaml; charset=utf-8"
 	case "sing-box":
 		out := []any{}
 		tags := []string{}
@@ -144,24 +147,30 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append([]any{map[string]any{"type": "selector", "tag": "proxy", "outbounds": tags}}, out...)
 		out = append(out, map[string]any{"type": "direct", "tag": "direct"})
-		rawJSON(w, map[string]any{"outbounds": out, "route": map[string]any{"final": "proxy"}})
+		data, err = json.Marshal(map[string]any{"outbounds": out, "route": map[string]any{"final": "proxy"}})
+		contentType = "application/json"
 	case "uri":
 		lines := []string{}
 		for _, n := range allowed {
 			lines = append(lines, uri(n, subscriptionPassword(account, n), uuid))
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n")))))
+		data = []byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n"))))
+		contentType = "text/plain; charset=utf-8"
 	}
-}
-func rawJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
+	if err != nil {
+		p.Fail(w, 500, "订阅生成失败")
+		return
+	}
+	if !a.bindClient(w, link, client, major) {
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	_, _ = w.Write(data)
 }
 func (a *app) view(r *http.Request) (p.View, error) {
-	res := p.Resource{Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "生成订阅", Empty: "开通访问账户后，生成自己的订阅链接", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，确定重置？"}}}
+	res := p.Resource{Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "创建订阅", Empty: "开通访问账户后，创建订阅链接", Deletable: true, Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("name", "名称", "text", false), c.Field("boundClient", "绑定客户端", "text", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，并解除客户端绑定，确定重置？"}}}
 	if p.Admin(r) {
-		res.Fields = []p.Field{c.UserField(a.C)}
+		res.Fields = []p.Field{c.UserField(a.C), c.Field("name", "名称", "text", false), {Key: "bindUserAgent", Label: "绑定首次使用的客户端", Type: "boolean", Hint: "客户端标识可以伪造，不能代替保管链接"}}
 		setting := p.Field{Key: "enabled", Label: "订阅拉取前要求人机验证", Type: "boolean", Hint: "启用后，用户需在订阅页面验证一次，客户端才能继续自动更新；关闭后重新启用时需重新验证。"}
 		return p.View{Title: "订阅与客户端", Resources: []p.Resource{res, {Key: "verification", Title: "订阅验证", Endpoint: "/verification/settings", Singleton: true, Editable: true, Fields: []p.Field{setting}, Columns: []p.Field{setting}}}}, nil
 	}

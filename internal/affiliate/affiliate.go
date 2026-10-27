@@ -29,21 +29,7 @@ func New() http.Handler {
 }
 
 func (a *app) query(collection string, filters ...p.Record) ([]p.Record, error) {
-	out := []p.Record{}
-	for offset := 0; ; {
-		var page struct {
-			Items []p.Record `json:"items"`
-			Total int        `json:"total"`
-		}
-		if e := a.C.Request("POST", "/api/v1/runtime/query", p.Record{"collection": collection, "filters": filters, "offset": offset, "limit": 1000}, &page); e != nil {
-			return nil, e
-		}
-		out = append(out, page.Items...)
-		offset += len(page.Items)
-		if offset >= page.Total || len(page.Items) == 0 {
-			return out, nil
-		}
-	}
+	return a.QueryAll(collection, filters...)
 }
 
 func equal(field string, value any) p.Record { return p.Record{"field": field, "value": value} }

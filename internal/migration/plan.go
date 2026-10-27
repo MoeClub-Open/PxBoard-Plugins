@@ -7,6 +7,7 @@ import (
 	"maps"
 	"math/big"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ type mapper struct {
 	Plan        *Plan
 	Users       map[string]bool
 	Machines    map[string]bool
+	Groups      map[string]string
 	MFA         map[string]string
 	NodeCounter int64
 	UsedTables  map[string]bool
@@ -51,7 +53,15 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 		return nil, e
 	}
 	plan := &Plan{SourceID: snapshot.SourceID, Mapped: map[string]int{}, ArchiveOnly: map[string]int{}, Warnings: []string{}, Errors: []string{}, Rows: []p.ImportRow{}}
-	m := &mapper{S: snapshot, Options: options, Plan: plan, Users: map[string]bool{}, Machines: map[string]bool{}, MFA: map[string]string{}, UsedTables: map[string]bool{}}
+	m := &mapper{S: snapshot, Options: options, Plan: plan, Users: map[string]bool{}, Machines: map[string]bool{}, Groups: map[string]string{}, MFA: map[string]string{}, UsedTables: map[string]bool{}}
+	if snapshot.Source == "xboard" || snapshot.Source == "v2board" {
+		for _, row := range snapshot.Rows("v2_server_group") {
+			id, name := text(row, "id"), strings.TrimSpace(text(row, "name"))
+			if id != "" && name != "" {
+				m.Groups[m.group(id)] = name
+			}
+		}
+	}
 	m.checkPendingOrders()
 	if snapshot.Source == "sspanel" {
 		m.ssUsers()
@@ -74,6 +84,7 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	} else {
 		return nil, fmt.Errorf("不支持的来源类型：%s", snapshot.Source)
 	}
+	m.writeGroups()
 	if !options.IncludeAffiliate {
 		m.warning("未选择推广插件：原推广关系、个人返佣规则和购买历史仅归档，不在目标启用；非零可用佣金会阻断导入。")
 	}
@@ -261,7 +272,28 @@ func (m *mapper) userID(row Row, key string) string {
 	}
 	return m.id("user", id)
 }
-func (m *mapper) group(id string) string { return m.S.SourceID + ":group:" + id }
+func (m *mapper) group(id string) string {
+	key := m.S.SourceID + ":group:" + id
+	if _, ok := m.Groups[key]; !ok {
+		name := m.S.SourceID + " · 分组 " + id
+		if id == "" {
+			name = m.S.SourceID + " · 未指定分组"
+		}
+		m.Groups[key] = name
+	}
+	return key
+}
+
+func (m *mapper) writeGroups() {
+	ids := make([]string, 0, len(m.Groups))
+	for id := range m.Groups {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		m.doc("nodes", "groups", id, p.Record{"name": m.Groups[id], "enabled": !strings.HasSuffix(id, ":group:"), "sourceId": m.S.SourceID, "createdAt": m.S.ExportedAt})
+	}
+}
 func groupIDs(value any) []string {
 	raw := Row{"v": value}
 	textValue := text(raw, "v")

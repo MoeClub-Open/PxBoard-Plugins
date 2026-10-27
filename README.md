@@ -8,13 +8,14 @@
 | registration | [账户注册与全局注册开关](docs/registration.md) |
 | access | [访问权益、配额、周期流量](docs/access-redeem.md) |
 | nodes | [节点、接入令牌、配置同步与状态监控](docs/noders-management.md) |
-| subscriptions | Clash、sing-box、通用订阅 |
+| subscriptions | [通用订阅、多链接与客户端绑定](docs/subscriptions.md) |
 | redeem | [访问权益与可选余额兑换码](docs/redeem.md) |
 | commerce | [套餐、订单、余额、价格优惠](docs/commerce.md) |
 | affiliate | [推广、佣金与提现](docs/affiliate.md) |
 | payments | Stripe 与易支付 |
 | audit | 流量审计、阻断与账户暂停 |
-| support | [工单、公告、文档与邮件](docs/support.md) |
+| support | [工单、公告和文档](docs/support.md) |
+| notifications | [独立邮件投递和密码找回](docs/notifications.md) |
 | oauth | [Google、GitHub、LinuxDO 登录与账号绑定](docs/oauth.md) |
 | captcha | [可选人机验证：Turnstile、hCaptcha、reCAPTCHA v2](docs/captcha.md) |
 | import-sspanel | [从 SSPanel 导入用户、权益、余额、套餐和订阅](docs/migration.md) |
@@ -38,11 +39,13 @@ go build -o bin/px-agent ./cmd/agent
 | --- | --- |
 | 自用 | branding、nodes、subscriptions |
 | 公益 / 分享 | branding、registration、nodes、subscriptions、redeem、audit |
-| 商业 | branding、registration、nodes、subscriptions、commerce、payments、audit、support |
+| 商业 | branding、registration、nodes、subscriptions、commerce、payments、audit、support、notifications |
 
 依赖插件由安装器一并安装。人机验证与推广插件在所有模式下均为可选，公益站点无需安装；商业模式也可按需安装兑换码或 OAuth。注册、兑换码和推广分别由独立插件提供，商业插件只负责套餐、订单、余额与价格优惠。停用插件会关闭对应入口和接口，已有业务数据保留。
 
 完整功能边界、模式与节点接入方式见同级主仓库 `docs/`。主项目、官方插件和官方插件源分别存放，批量发布由独立 `PxBoard-Registry` 仓库执行。
+
+各插件职责、可选关系与共享能力见[插件架构](docs/architecture.md)。
 
 ## 数据迁移与升级
 

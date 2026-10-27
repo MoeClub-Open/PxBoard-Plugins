@@ -188,11 +188,11 @@ func (a *app) allAccounts(w http.ResponseWriter, r *http.Request) {
 }
 func (a *app) view(r *http.Request) (p.View, error) {
 	admin := p.Admin(r)
-	res := p.Resource{Key: "accounts", Title: "访问账户", Endpoint: "/accounts", Empty: "还没有访问账户", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("status", "状态", "status", false), c.Field("usedGiB", "已用流量", "gib", false), c.Field("quotaGiB", "流量额度", "gib", false), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("groups", "节点分组", "text", false)}}
+	res := p.Resource{Key: "accounts", Title: "访问账户", Endpoint: "/accounts", Empty: "还没有访问账户", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("status", "状态", "status", false), c.Field("usedGiB", "已用流量", "gib", false), c.Field("quotaGiB", "流量额度", "gib", false), c.Field("expiresAt", "到期时间", "datetime", false), c.GroupField("groups", "节点分组", false)}}
 	if admin {
 		res.CreateLabel = "添加访问账户"
 		res.Editable = true
-		res.Fields = []p.Field{c.UserField(a.C), c.Field("quotaGiB", "每周期流量（GB）", "number", true), c.Field("cycleDays", "重置周期（天，0 为不重置）", "number", true), c.Field("expiresAt", "到期时间（留空为长期）", "datetime", false), c.Field("groups", "可用节点分组", "text", true), c.Select("status", "状态", "active|正常", "suspended|暂停"), c.Field("unlimited", "不限流量", "boolean", false)}
+		res.Fields = []p.Field{c.UserField(a.C), c.Field("quotaGiB", "每周期流量（GB）", "number", true), c.Field("cycleDays", "重置周期（天，0 为不重置）", "number", true), c.Field("expiresAt", "到期时间（留空为长期）", "datetime", false), c.GroupField("groups", "可用节点分组", true), c.Select("status", "状态", "active|正常", "suspended|暂停"), c.Field("unlimited", "不限流量", "boolean", false)}
 		res.Fields[1].Default = 100
 		res.Fields[2].Default = 30
 		res.Fields[4].Default = "default"
