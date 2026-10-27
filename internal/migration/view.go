@@ -21,7 +21,16 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		return p.View{}, fmt.Errorf("仅管理员可执行数据迁移")
 	}
 	title := map[string]string{"sspanel": "SSPanel", "v2board": "V2Board", "xboard": "Xboard"}[a.Source]
-	fields := []p.Field{c.Field("name", "任务名称", "text", true), c.Field("sourcePath", "快照文件路径（与数据库连接二选一）", "text", false), c.Field("dsn", "只读 MySQL 连接（与快照二选一）", "password", false), c.Field("sourceId", "来源标识（直接连接数据库时填写）", "text", false), {Key: "timezone", Label: "源数据库时区", Type: "text", Default: "Asia/Shanghai"}, {Key: "passwordMethod", Label: "旧密码算法", Type: "select", Default: "auto", Options: []p.Option{{Label: "自动识别编码密码 / 使用源字段", Value: "auto"}, {Label: "bcrypt", Value: "bcrypt"}, {Label: "Argon2id", Value: "argon2id"}, {Label: "Argon2i", Value: "argon2i"}, {Label: "MD5", Value: "md5"}, {Label: "MD5 + 盐", Value: "md5salt"}, {Label: "SHA256", Value: "sha256"}, {Label: "SHA256 + 盐", Value: "sha256salt"}, {Label: "SHA3-256 + 盐", Value: "sha3salt"}}}, c.Field("passwordSalt", "旧密码盐（使用带盐算法时填写）", "password", false)}
+	fields := []p.Field{
+		c.Field("name", "任务名称", "text", true),
+		{Key: "sourceType", Label: "数据来源", Type: "select", Default: "snapshot", Required: true, Options: []p.Option{{Label: "快照文件", Value: "snapshot"}, {Label: "MySQL 数据库", Value: "database"}}},
+		{Key: "sourcePath", Label: "快照文件路径", Type: "text", Required: true, Hint: "填写面板服务器上快照文件的绝对路径", When: map[string][]string{"sourceType": {"snapshot"}}},
+		{Key: "dsn", Label: "只读 MySQL 连接", Type: "password", Required: true, When: map[string][]string{"sourceType": {"database"}}},
+		{Key: "sourceId", Label: "来源标识", Type: "text", Required: true, Hint: "使用小写字母、数字、下划线或连字符，为每个源站设置不同标识", When: map[string][]string{"sourceType": {"database"}}},
+		{Key: "timezone", Label: "源数据库时区", Type: "text", Default: "Asia/Shanghai"},
+		{Key: "passwordMethod", Label: "旧密码算法", Type: "select", Default: "auto", Options: []p.Option{{Label: "自动识别编码密码 / 使用源字段", Value: "auto"}, {Label: "bcrypt", Value: "bcrypt"}, {Label: "Argon2id", Value: "argon2id"}, {Label: "Argon2i", Value: "argon2i"}, {Label: "MD5", Value: "md5"}, {Label: "MD5 + 盐", Value: "md5salt"}, {Label: "SHA256", Value: "sha256"}, {Label: "SHA256 + 盐", Value: "sha256salt"}, {Label: "SHA3-256 + 盐", Value: "sha3salt"}}},
+		{Key: "passwordSalt", Label: "旧密码盐（如适用）", Type: "password", When: map[string][]string{"passwordMethod": {"auto", "md5salt", "sha256", "sha256salt", "sha3salt"}}},
+	}
 	fields = append(fields, p.Field{Key: "includeNodes", Label: "同时导入节点和机器", Type: "boolean", Default: false})
 	fields = append(fields, p.Field{Key: "includeAffiliate", Label: "同时导入推广关系与佣金（需启用推广插件）", Type: "boolean", Default: false})
 	if a.Source != "sspanel" {
