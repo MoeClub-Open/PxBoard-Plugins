@@ -62,5 +62,6 @@ func (a *app) currencyView(r *http.Request) (p.View, error) {
 		return p.View{}, fmt.Errorf("仅管理员可修改金额单位")
 	}
 	fields := []p.Field{c.Field("currencyName", "金额单位", "text", true), c.Field("currencySymbol", "金额符号", "text", true)}
+	fields[0].Hint = "仅改变显示，不会换算金额或更改支付渠道的结算币种"
 	return p.View{Title: "金额设置", Resources: []p.Resource{{Key: "currency", Title: "金额单位", Endpoint: "/currency", Singleton: true, Editable: true, Fields: fields, Columns: fields}}}, nil
 }
