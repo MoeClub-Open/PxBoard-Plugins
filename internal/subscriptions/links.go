@@ -65,7 +65,7 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filters := []p.Record{}
-	if !p.Admin(r) {
+	if !p.Admin(r) || r.URL.Query().Get("mine") == "1" {
 		filters = append(filters, p.Record{"field": "userId", "value": p.Subject(r).ID})
 	}
 	rows, e := a.queryLinks(filters)

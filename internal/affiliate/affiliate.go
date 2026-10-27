@@ -57,7 +57,7 @@ func (a *app) record(collection, id string) (p.Record, error) {
 }
 
 func (a *app) owned(collection string, r *http.Request) ([]p.Record, error) {
-	if p.Admin(r) {
+	if p.Admin(r) && r.URL.Query().Get("mine") != "1" {
 		return a.query(collection)
 	}
 	return a.query(collection, equal("userId", p.Subject(r).ID))

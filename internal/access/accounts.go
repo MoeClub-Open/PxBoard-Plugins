@@ -9,7 +9,7 @@ import (
 func cycleNow() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 
 func subjectUser(r *http.Request) string {
-	if p.Admin(r) {
+	if p.Admin(r) && r.URL.Query().Get("mine") != "1" {
 		return ""
 	}
 	return p.Subject(r).ID

@@ -15,7 +15,7 @@ func (a *app) orders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, e := a.Filter("orders", func(row p.Record) bool {
-		return c.Own(r, row) && (r.URL.Query().Get("kind") == "" || p.Text(row, "kind") == r.URL.Query().Get("kind"))
+		return c.OwnList(r, row) && (r.URL.Query().Get("kind") == "" || p.Text(row, "kind") == r.URL.Query().Get("kind"))
 	})
 	if !c.Err(w, e) {
 		p.JSON(w, rows)

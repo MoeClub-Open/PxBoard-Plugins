@@ -21,7 +21,7 @@ func (a *app) ledger(w http.ResponseWriter, r *http.Request) {
 	if !c.Member(w, r) {
 		return
 	}
-	rows, e := a.Filter("ledger", func(row p.Record) bool { return c.Own(r, row) })
+	rows, e := a.Filter("ledger", func(row p.Record) bool { return c.OwnList(r, row) })
 	if !c.Err(w, e) {
 		p.JSON(w, rows)
 	}

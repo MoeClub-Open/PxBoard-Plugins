@@ -1,7 +1,7 @@
 {
   "id": "affiliate",
   "name": "推广返佣",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "apiVersion": "1.0",
   "minCoreVersion": "0.4.1",
   "description": "推荐关系、返佣规则、自助转入余额和现金提现审批",
