@@ -37,6 +37,14 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 	}
 	admin := p.Admin(r)
 	mine := !admin || r.URL.Query().Get("scope") == "mine"
+	var fields []string
+	if mine {
+		config, err := a.config()
+		if c.Err(w, err) {
+			return
+		}
+		fields = selectedStatusFields(config)
+	}
 	accounts := []p.Record{}
 	if mine {
 		var all []p.Record
@@ -92,7 +100,10 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 				statusNode[key] = node[key]
 			}
 		}
-		row := nodeStatus(statusNode, machine, admin && !mine)
+		row := nodeStatus(statusNode, machine, true)
+		if mine {
+			row = filterUserStatus(row, fields)
+		}
 		if parent != nil && admin && !mine {
 			row["parentName"] = parent["name"]
 		}
@@ -171,6 +182,23 @@ func (a *app) statusView(r *http.Request) (p.View, error) {
 	columns := []p.Field{c.Field("name", "节点", "text", false), c.Field("region", "地区", "text", false), c.Field("protocol", "协议", "tag", false), c.Field("statusLabel", "状态", "text", false), c.Field("trafficRate", "流量倍率", "number", false), c.Field("lastSeen", "最近心跳", "datetime", false)}
 	if p.Admin(r) {
 		columns = append(columns, c.Field("machineName", "机器", "text", false), c.Field("parentName", "共用节点", "text", false), c.Field("onlineAccounts", "在线账户", "number", false), c.Field("cpuPercent", "CPU（%）", "number", false), c.Field("memoryPercent", "内存（%）", "number", false), c.Field("diskPercent", "磁盘（%）", "number", false), c.Field("loadUpdatedAt", "负载更新时间", "datetime", false), c.Field("error", "运行错误", "text", false))
+	} else {
+		config, err := a.config()
+		if err != nil {
+			return p.View{}, err
+		}
+		columns = []p.Field{c.Field("name", "节点", "text", false)}
+		for _, key := range selectedStatusFields(config) {
+			for _, option := range statusOptions {
+				if option.Value == key {
+					column := key
+					if key == "status" {
+						column = "statusLabel"
+					}
+					columns = append(columns, c.Field(column, option.Label, "text", false))
+				}
+			}
+		}
 	}
 	return p.View{Title: "节点状态", Resources: []p.Resource{{Key: "status", Title: "节点", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无可查看的节点"}}}, nil
 }

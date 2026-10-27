@@ -29,11 +29,22 @@ func New() http.Handler {
 	a.Mux.HandleFunc("PATCH /verification", a.verificationSettings)
 	a.Mux.HandleFunc("GET /verification/settings", a.verificationSettings)
 	a.Mux.HandleFunc("PATCH /verification/settings", a.verificationSettings)
+	a.Mux.HandleFunc("GET /settings", a.settings)
+	a.Mux.HandleFunc("PATCH /settings", a.settings)
+	a.Mux.HandleFunc("GET /settings/public", a.publicSettings)
 	a.Mux.HandleFunc("GET /s/{token}", a.export)
 	return a
 }
 func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	settings, e := a.subscriptionSettings()
+	if c.Err(w, e) {
+		return
+	}
+	if p.Bool(settings, "hideFromBrowsers") && matchesBrowser(r, p.Text(settings, "browserAgents")) {
+		disguise(w)
+		return
+	}
 	rows, e := a.queryLinks([]p.Record{{"field": "token", "value": r.PathValue("token")}})
 	if c.Err(w, e) {
 		return
@@ -43,7 +54,7 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	link := rows[0]
-	client, major, ok := a.checkClient(w, r, link)
+	client, major, ok := a.checkClient(w, r, link, p.Text(settings, "browserAgents"))
 	if !ok {
 		return
 	}
@@ -172,7 +183,9 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	if p.Admin(r) {
 		res.Fields = []p.Field{c.UserField(a.C), c.Field("name", "名称", "text", false), {Key: "bindUserAgent", Label: "绑定首次使用的客户端", Type: "boolean", Hint: "客户端标识可以伪造，不能代替保管链接"}}
 		setting := p.Field{Key: "enabled", Label: "订阅拉取前要求人机验证", Type: "boolean", Hint: "启用后，用户需在订阅页面验证一次，客户端才能继续自动更新；关闭后重新启用时需重新验证。"}
-		return p.View{Title: "订阅与客户端", Resources: []p.Resource{res, {Key: "verification", Title: "订阅验证", Endpoint: "/verification/settings", Singleton: true, Editable: true, Fields: []p.Field{setting}, Columns: []p.Field{setting}}}}, nil
+		browser := p.Field{Key: "hideFromBrowsers", Label: "浏览器访问时隐藏订阅", Type: "boolean", Hint: "按请求的 User-Agent 判断，可被伪造"}
+		agents := p.Field{Key: "browserAgents", Label: "浏览器 User-Agent 关键词", Type: "textarea", Hint: "每行一个关键词，不区分大小写；匹配时返回伪装页面"}
+		return p.View{Title: "订阅与客户端", Resources: []p.Resource{res, {Key: "settings", Title: "订阅访问", Endpoint: "/settings", Singleton: true, Editable: true, Fields: []p.Field{browser, agents}, Columns: []p.Field{browser, agents}}, {Key: "verification", Title: "订阅验证", Endpoint: "/verification/settings", Singleton: true, Editable: true, Fields: []p.Field{setting}, Columns: []p.Field{setting}}}}, nil
 	}
 	return p.View{Title: "订阅与客户端", Notice: "Mieru 节点请使用 Mihomo；sing-box 订阅仅包含其支持的节点。", Resources: []p.Resource{res}}, nil
 }

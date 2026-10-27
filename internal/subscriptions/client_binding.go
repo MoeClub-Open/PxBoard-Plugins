@@ -11,9 +11,14 @@ import (
 
 var clientProduct = regexp.MustCompile(`(?i)^([a-z][a-z0-9._+-]*)(?:[/\s]+v?([0-9]+))?`)
 
-func browserRequest(r *http.Request) bool {
+func matchesBrowser(r *http.Request, agents string) bool {
 	ua := strings.ToLower(strings.TrimSpace(r.UserAgent()))
-	return strings.HasPrefix(ua, "mozilla/") || strings.EqualFold(r.Header.Get("Sec-Fetch-Mode"), "navigate") || strings.EqualFold(r.Header.Get("Sec-Fetch-Dest"), "document")
+	for _, line := range strings.Split(agents, "\n") {
+		if term := strings.ToLower(strings.TrimSpace(line)); term != "" && strings.Contains(ua, term) {
+			return true
+		}
+	}
+	return false
 }
 
 func clientIdentity(r *http.Request) (string, string) {
@@ -31,11 +36,11 @@ func disguise(w http.ResponseWriter) {
 	_, _ = w.Write([]byte("<!doctype html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>"))
 }
 
-func (a *app) checkClient(w http.ResponseWriter, r *http.Request, link p.Record) (string, string, bool) {
+func (a *app) checkClient(w http.ResponseWriter, r *http.Request, link p.Record, agents string) (string, string, bool) {
 	if !p.Bool(link, "bindUserAgent") {
 		return "", "", true
 	}
-	if browserRequest(r) {
+	if matchesBrowser(r, agents) {
 		disguise(w)
 		return "", "", false
 	}

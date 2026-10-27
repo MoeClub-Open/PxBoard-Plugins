@@ -15,7 +15,7 @@
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "dependencies": {
     "access": ">=1.4.2"
   },
@@ -62,7 +62,7 @@
     }
   ],
   "summary": true,
-  "minCoreVersion": "0.4.11",
+  "minCoreVersion": "0.4.12",
   "capabilities": [
     "portal.status"
   ]
