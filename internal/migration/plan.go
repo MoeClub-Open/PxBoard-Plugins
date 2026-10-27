@@ -62,6 +62,12 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	} else if snapshot.Source == "v2board" || snapshot.Source == "xboard" {
 		m.v2Users()
 		m.v2Plans()
+		for _, row := range snapshot.Rows("v2_settings") {
+			if text(row, "name") == "currency" || text(row, "name") == "currency_symbol" {
+				m.warning("原站设置包含金额单位；请在商业插件的金额设置中核对原单位和符号，迁移不会覆盖目标设置。")
+				break
+			}
+		}
 		if options.IncludeNodes {
 			m.v2Nodes()
 		}

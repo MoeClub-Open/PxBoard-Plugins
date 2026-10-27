@@ -60,7 +60,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 	if p.Text(b, "kind") == "recharge" {
 		amount := p.Number(b, "amount")
 		if amount < 100 || amount > 10000000 || math.Trunc(amount) != amount {
-			p.Fail(w, 400, "充值金额至少 1 元，使用整数分")
+			p.Fail(w, 400, "充值金额不得低于最低限额，金额使用最小单位的整数")
 			return
 		}
 		row["amount"] = amount

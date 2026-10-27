@@ -84,9 +84,9 @@ func (a *app) withdraw(w http.ResponseWriter, r *http.Request) {
 		minimum = 100
 	}
 	if amount < minimum || math.Trunc(amount) != amount || amount > available {
-		message := "可转入金额不足，最低 0.01 元"
+		message := "可转入金额不足"
 		if method == "cash" {
-			message = "可提现金额不足，最低 1 元"
+			message = "可提现金额不足"
 		}
 		p.Fail(w, 400, message)
 		return

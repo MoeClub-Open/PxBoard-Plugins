@@ -68,6 +68,9 @@ func New() http.Handler {
 	})
 	a.Mux.HandleFunc("GET /orders", a.orders)
 	a.Mux.HandleFunc("GET /public/plans", a.publicPlans)
+	a.Mux.HandleFunc("GET /public/currency", a.publicCurrency)
+	a.Mux.HandleFunc("GET /currency", a.currencySettings)
+	a.Mux.HandleFunc("PATCH /currency", a.currencySettings)
 	a.Mux.HandleFunc("POST /plans/{id}/details", func(w http.ResponseWriter, r *http.Request) {
 		if !c.Require(w, r) {
 			return
@@ -94,6 +97,7 @@ func New() http.Handler {
 	a.View("orders", a.orderView)
 	a.View("wallet", a.walletView)
 	a.View("coupons", a.couponView)
+	a.View("currency", a.currencyView)
 	a.Summary(func(r *http.Request) ([]p.Metric, error) {
 		rows, e := a.Filter("orders", func(row p.Record) bool { return c.Own(r, row) })
 		if e != nil {

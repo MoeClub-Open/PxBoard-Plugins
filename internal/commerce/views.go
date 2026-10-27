@@ -26,12 +26,12 @@ func planResource() p.Resource {
 	}}
 }
 func couponResource() p.Resource {
-	f := []p.Field{c.Field("code", "优惠码", "text", true), c.Select("type", "优惠方式", "percent|减免百分比", "fixed|固定金额"), c.Field("discount", "优惠额度", "number", true), c.Field("limit", "可用次数", "number", true), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}
+	f := []p.Field{c.Field("code", "优惠码", "text", true), c.Select("type", "优惠方式", "percent|减免百分比", "fixed|固定金额"), c.Field("discount", "优惠额度", "discount", true), c.Field("limit", "可用次数", "number", true), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}
 	f[1].Default = "percent"
 	f[2].Default = 10
 	f[3].Default = 100
 	f[5].Default = true
-	return p.Resource{Key: "coupons", Title: "优惠码", Endpoint: "/coupons", CreateLabel: "创建优惠码", Editable: true, Deletable: true, Fields: f, Columns: []p.Field{c.Field("code", "优惠码", "copy", false), c.Field("type", "优惠方式", "tag", false), c.Field("discount", "优惠额度", "number", false), c.Field("limit", "可用次数", "number", false), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}}
+	return p.Resource{Key: "coupons", Title: "优惠码", Endpoint: "/coupons", CreateLabel: "创建优惠码", Editable: true, Deletable: true, Fields: f, Columns: []p.Field{c.Field("code", "优惠码", "copy", false), c.Field("type", "优惠方式", "tag", false), c.Field("discount", "优惠额度", "discount", false), c.Field("limit", "可用次数", "number", false), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}}
 }
 func (a *app) checkoutAction() *p.Action {
 	f := c.Field("channelId", "支付渠道", "select", true)

@@ -1,6 +1,6 @@
 {
   "author": "PxBoard",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "homepage": "",
   "events": [
     "payment.succeeded",
@@ -43,6 +43,13 @@
         "admin",
         "member"
       ],
+      "group": "运营"
+    },
+    {
+      "title": "金额设置",
+      "id": "currency",
+      "icon": "settings",
+      "roles": ["admin"],
       "group": "运营"
     },
     {
