@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type app struct{ *c.App }
@@ -21,6 +23,11 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /links", a.links)
 	a.Mux.HandleFunc("POST /links", a.create)
 	a.Mux.HandleFunc("POST /links/{id}/rotate", a.rotate)
+	a.Mux.HandleFunc("POST /links/{id}/verify", a.verifyLink)
+	a.Mux.HandleFunc("GET /verification", a.verificationSettings)
+	a.Mux.HandleFunc("PATCH /verification", a.verificationSettings)
+	a.Mux.HandleFunc("GET /verification/settings", a.verificationSettings)
+	a.Mux.HandleFunc("PATCH /verification/settings", a.verificationSettings)
 	a.Mux.HandleFunc("GET /s/{token}", a.export)
 	return a
 }
@@ -35,6 +42,14 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	link := rows[0]
+	policy, e := a.verificationPolicy()
+	if c.Err(w, e) {
+		return
+	}
+	if p.Bool(policy, "enabled") && !verified(link, policy) {
+		p.Fail(w, 403, "请先登录面板并完成订阅验证")
+		return
+	}
 	var clients, nodes []p.Record
 	if c.Err(w, a.C.Call("access", "GET", "/internal/clients?userId="+url.QueryEscape(p.Text(link, "userId")), nil, &clients)) {
 		return
@@ -64,17 +79,7 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		info += fmt.Sprintf("; expire=%d", expires.Unix())
 	}
 	w.Header().Set("Subscription-Userinfo", info)
-	format := r.URL.Query().Get("format")
-	if format == "" {
-		ua := strings.ToLower(r.UserAgent())
-		if strings.Contains(ua, "clash") || strings.Contains(ua, "mihomo") {
-			format = "clash"
-		} else if strings.Contains(ua, "sing-box") {
-			format = "sing-box"
-		} else {
-			format = "uri"
-		}
-	}
+	format := subscriptionFormat(r)
 	if !c.Allowed(format, "clash", "sing-box", "uri") {
 		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
 		return
@@ -119,7 +124,14 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		if len(names) == 0 {
 			names = []string{"DIRECT"}
 		}
-		rawJSON(w, map[string]any{"proxies": proxies, "proxy-groups": []any{map[string]any{"name": "代理选择", "type": "select", "proxies": names}}, "rules": []string{"MATCH,代理选择"}})
+		config := map[string]any{"proxies": proxies, "proxy-groups": []any{map[string]any{"name": "代理选择", "type": "select", "proxies": names}}, "rules": []string{"MATCH,代理选择"}}
+		data, err := yaml.Marshal(config)
+		if err != nil {
+			p.Fail(w, 500, "订阅生成失败")
+			return
+		}
+		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+		_, _ = w.Write(data)
 	case "sing-box":
 		out := []any{}
 		tags := []string{}
@@ -147,9 +159,11 @@ func rawJSON(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func (a *app) view(r *http.Request) (p.View, error) {
-	res := p.Resource{Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "生成订阅", Empty: "开通访问账户后，生成自己的订阅链接", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("clashUrl", "Clash / Mihomo", "link", false), c.Field("singboxUrl", "sing-box", "link", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，确定重置？"}}}
+	res := p.Resource{Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "生成订阅", Empty: "开通访问账户后，生成自己的订阅链接", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，确定重置？"}}}
 	if p.Admin(r) {
 		res.Fields = []p.Field{c.UserField(a.C)}
+		setting := p.Field{Key: "enabled", Label: "订阅拉取前要求人机验证", Type: "boolean", Hint: "启用后，用户需在订阅页面验证一次，客户端才能继续自动更新；关闭后重新启用时需重新验证。"}
+		return p.View{Title: "订阅与客户端", Resources: []p.Resource{res, {Key: "verification", Title: "订阅验证", Endpoint: "/verification/settings", Singleton: true, Editable: true, Fields: []p.Field{setting}, Columns: []p.Field{setting}}}}, nil
 	}
 	return p.View{Title: "订阅与客户端", Notice: "Mieru 节点请使用 Mihomo；sing-box 订阅仅包含其支持的节点。", Resources: []p.Resource{res}}, nil
 }

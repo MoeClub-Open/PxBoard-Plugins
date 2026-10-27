@@ -72,6 +72,10 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, e) {
 		return
 	}
+	policy, e := a.verificationPolicy()
+	if c.Err(w, e) {
+		return
+	}
 	users, e := a.C.Users()
 	if c.Err(w, e) {
 		return
@@ -81,11 +85,14 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 		emails[p.Text(u, "id")] = u["email"]
 	}
 	for _, row := range rows {
+		row["verificationRequired"] = p.Bool(policy, "enabled")
+		row["verified"] = verified(row, policy)
+		delete(row, "verificationVersion")
 		row["email"] = emails[p.Text(row, "userId")]
 		base := "/api/v1/extensions/subscriptions/s/" + url.PathEscape(p.Text(row, "token"))
 		row["clashUrl"] = base + "?format=clash"
 		row["singboxUrl"] = base + "?format=sing-box"
-		row["shareUrl"] = base + "?format=uri"
+		row["shareUrl"] = base
 	}
 	p.JSON(w, rows)
 }
@@ -108,6 +115,7 @@ func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row["token"] = p.ID() + p.ID()
+	delete(row, "verificationVersion")
 	if !c.Err(w, a.C.Put("links", row)) {
 		p.JSON(w, true)
 	}

@@ -9,11 +9,12 @@
     "storage:own",
     "users:read",
     "call:access",
-    "call:nodes"
+    "call:nodes",
+    "challenge:verify"
   ],
   "author": "PxBoard",
   "category": "连接",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "dependencies": {
     "access": ">=1.3.0",
     "nodes": ">=1.3.0"
@@ -32,5 +33,5 @@
       "group": "连接"
     }
   ],
-  "minCoreVersion": "0.3.0"
+  "minCoreVersion": "0.4.7"
 }

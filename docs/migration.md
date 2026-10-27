@@ -217,15 +217,13 @@ SSPanel VMess 依据原 `security` 决定是否启用 TLS；不会对原先未�
 
 再核对各付费周期的套餐价格、期限单位、分组与上架状态。SSPanel 等待核对的商品应在确认规则后才上架，原支付配置和审计规则需要分别配置。
 
-订阅路径为：
+通用订阅地址为：
 
 ```text
-https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌?format=clash
-https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌?format=sing-box
-https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌?format=uri
+https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌
 ```
 
-即使令牌未变，旧面板路径仍需要在客户端更新；PxBoard 不模拟旧面板接口。节点接入且用户连接成功后，再完成域名或服务入口切换。保留源站备份和旧服务恢复方式，直到确认切换完成。
+通用地址根据客户端标识选择格式：识别到 sing-box 或 Hiddify 等返回 sing-box 配置，v2rayN、v2rayNG 或 Shadowrocket 等返回节点链接，其余默认返回 Mihomo 配置。需要固定格式时可在地址末尾添加 `?format=clash`、`?format=sing-box` 或 `?format=uri`。即使令牌未变，旧面板路径仍需要在客户端更新，除非管理员单独配置旧地址转发。节点接入且用户连接成功后，再完成域名或服务入口切换。保留源站备份和旧服务恢复方式，直到确认切换完成。
 
 Mieru 支持 Mihomo（`format=clash`）和官方 `mierus://` 分享链接（`format=uri`），用户名与密码沿用原 UUID。sing-box 不支持原生 Mieru，因此混合订阅会保留可用节点并跳过 Mieru，响应头 `X-PxBoard-Skipped-Protocols` 会列出跳过的协议；若全部节点均不支持，则返回明确错误，避免生成只能直连的空代理配置。其他尚未支持的协议采用相同规则。
 

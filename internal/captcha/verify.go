@@ -31,7 +31,11 @@ func (a *app) verify(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, err) {
 		return
 	}
-	required := p.Bool(config, "enabled") && (p.Bool(config, b.Action) || b.Action == "oauth" && (p.Bool(config, "login") || p.Bool(config, "register")))
+	if b.Action == "subscription" && !p.Bool(config, "enabled") {
+		p.Fail(w, 503, "人机验证未启用")
+		return
+	}
+	required := p.Bool(config, "enabled") && (b.Action == "subscription" || p.Bool(config, b.Action) || b.Action == "oauth" && (p.Bool(config, "login") || p.Bool(config, "register")))
 	if !required {
 		p.JSON(w, true)
 		return
