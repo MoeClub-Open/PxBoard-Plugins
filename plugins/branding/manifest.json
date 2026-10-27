@@ -1,7 +1,7 @@
 {
   "id": "branding",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "name": "站点品牌",
   "version": "0.0.1",
   "description": "统一站点名称、Logo 和网站图标",

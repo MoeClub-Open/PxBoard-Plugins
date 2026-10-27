@@ -3,7 +3,7 @@
   "name": "推广返佣",
   "version": "0.0.1",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "description": "推荐关系、返佣规则、自助转入余额和现金提现审批",
   "category": "商业",
   "author": "PxBoard",

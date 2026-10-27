@@ -3,7 +3,7 @@
   "name": "人机验证",
   "version": "0.0.1",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "description": "可选的 Turnstile、hCaptcha 或 reCAPTCHA v2 人机验证",
   "category": "安全",
   "author": "PxBoard",

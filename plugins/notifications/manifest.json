@@ -3,7 +3,7 @@
   "name": "邮件通知",
   "version": "0.0.1",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "description": "邮件投递、密码找回和业务通知",
   "category": "服务",
   "author": "PxBoard",

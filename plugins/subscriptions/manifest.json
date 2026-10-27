@@ -33,6 +33,6 @@
       "group": "连接"
     }
   ],
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "versionEpoch": 1
 }

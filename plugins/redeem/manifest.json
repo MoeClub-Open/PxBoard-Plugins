@@ -1,7 +1,7 @@
 {
   "id": "redeem",
   "apiVersion": "1.0",
-  "minCoreVersion": "0.4.13",
+  "minCoreVersion": "1!0.0.1",
   "name": "兑换码",
   "version": "0.0.1",
   "description": "独立兑换码、访问权益与可选余额兑换",
