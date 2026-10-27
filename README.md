@@ -40,10 +40,9 @@ go build -o bin/px-agent ./cmd/agent
 | 模式 | 默认插件 |
 | --- | --- |
 | 自用 | branding、nodes、subscriptions |
-| 公益 / 分享 | branding、registration、nodes、subscriptions、redeem、audit |
 | 商业 | branding、registration、nodes、subscriptions、commerce、payments、audit、support、notifications |
 
-依赖插件由安装器一并安装。人机验证与推广插件在所有模式下均为可选，公益站点无需安装；商业模式也可按需安装兑换码或 OAuth。注册、兑换码和推广分别由独立插件提供，商业插件只负责套餐、订单、余额与价格优惠。停用插件会关闭对应入口和接口，已有业务数据保留。
+依赖插件由安装器一并安装。人机验证与推广插件在所有模式下均为可选；自用站点可按需安装注册、兑换码和审计，商业模式也可按需安装兑换码或 OAuth。注册、兑换码和推广分别由独立插件提供，商业插件只负责套餐、订单、余额与价格优惠。停用插件会关闭对应入口和接口，已有业务数据保留。
 
 完整功能边界、模式与节点接入方式见同级主仓库 `docs/`。主项目、官方插件和官方插件源分别存放，批量发布由独立 `PxBoard-Registry` 仓库执行。
 
