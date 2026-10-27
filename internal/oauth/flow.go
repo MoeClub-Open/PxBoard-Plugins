@@ -135,5 +135,5 @@ func (a *app) completeBinding(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, a.storeBinding(p.Text(row, "providerId"), p.Text(row, "subject"), p.Subject(r).ID, p.Text(row, "displayName"), c.Now())) || c.Err(w, a.C.Delete("pendingBindings", b.Ticket)) {
 		return
 	}
-	p.JSON(w, p.Record{"message": "账号已绑定", "redirectPath": "/account"})
+	p.JSON(w, p.Record{"message": "账号已绑定", "redirectPath": "/user/account"})
 }

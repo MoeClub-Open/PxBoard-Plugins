@@ -45,7 +45,7 @@ func localPath(path string) string {
 	if e != nil || u.IsAbs() || u.Host != "" || strings.ContainsAny(path, "\\\r\n") {
 		return "/user"
 	}
-	if u.Path == "/user" || strings.HasPrefix(u.Path, "/user/") || u.Path == "/account" || strings.HasPrefix(u.Path, "/account/") {
+	if u.Path == "/user" || strings.HasPrefix(u.Path, "/user/") || u.Path == "/admin" || strings.HasPrefix(u.Path, "/admin/") || u.Path == "/account" || strings.HasPrefix(u.Path, "/account/") {
 		return path
 	}
 	return "/user"
