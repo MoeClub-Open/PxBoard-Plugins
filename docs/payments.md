@@ -1,6 +1,6 @@
 # 支付网关
 
-`payments` 1.4.0 提供 Stripe 与易支付收银台、回调验签和支付流水，依赖商业插件 `commerce`。需要核心 0.4.0 或更新版本。
+`payments` 0.0.1 提供 Stripe 与易支付收银台、回调验签和支付流水，依赖商业插件 `commerce`。需要核心 0.0.1 或更新版本。
 
 ## 支付渠道
 
@@ -8,7 +8,7 @@
 
 Stripe 使用支付密钥及独立的回调签名密钥。收银台金额以分传给 Stripe，币种为 CNY。
 
-易支付使用 HTTPS 网关地址、商户号、通信密钥与付款方式。网关地址保留服务商要求的路径，不要填写末尾的 `/submit.php`；插件会自行追加该路径。付款方式直接传入网关的 `type` 参数，默认 `alipay`，也可以填写 `wxpay`、`qqpay` 或网关要求的其他值。Linux DO Credit 的易支付接口使用 `epay`。
+易支付使用 HTTPS 网关地址、商户号、通信密钥与付款方式。网关地址保留服务商要求的路径，不要填写末尾的 `/submit.php`；插件会自行追加该路径。付款方式直接传入网关的 `type` 参数，默认 `alipay`，也可以填写 `wxpay`、`qqpay` 或网关要求的其他值。插件不预设特定服务商的付款方式。
 
 易支付请求包括 `pid/type/out_trade_no/notify_url/return_url/name/money`；金额从整数分转换成两位小数。请求签名按参数名排序、排除空值及 `sign/sign_type`，用 `key=value` 和 `&` 连接后追加通信密钥，再计算 MD5。回调还要求商户号一致、`trade_status=TRADE_SUCCESS`，并检查订单金额、币种与支付流水的唯一性。
 

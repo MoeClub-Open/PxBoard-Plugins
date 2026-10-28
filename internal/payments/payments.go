@@ -68,7 +68,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		{Key: "webhookSecret", Label: "Stripe 回调签名密钥", Type: "password", When: map[string][]string{"provider": {"stripe"}}},
 		{Key: "merchantId", Label: "易支付商户号", Type: "text", When: map[string][]string{"provider": {"epay"}}},
 		{Key: "gatewayUrl", Label: "易支付网关地址", Type: "url", When: map[string][]string{"provider": {"epay"}}},
-		{Key: "paymentType", Label: "易支付付款方式", Type: "text", Default: "alipay", Hint: "填写网关支持的方式，如 alipay、wxpay；Linux DO Credit 使用 epay。", When: map[string][]string{"provider": {"epay"}}},
+		{Key: "paymentType", Label: "易支付付款方式", Type: "text", Default: "alipay", Hint: "填写网关支持的付款方式标识，如 alipay、wxpay、qqpay。", When: map[string][]string{"provider": {"epay"}}},
 		c.Field("publicUrl", "面板公开地址", "url", true),
 		c.Field("enabled", "启用", "boolean", false),
 	}
