@@ -2,6 +2,7 @@ package common
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
@@ -22,6 +23,9 @@ func (a *App) ReadRecords(collection string, r *http.Request, filters []p.Record
 	}
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	query := p.Query{Collection: collection, Limit: limit, Offset: offset, Search: r.URL.Query().Get("q"), SearchFields: searchFields}
+	if slices.Contains(searchFields, "userId") {
+		query.SearchUserField = "userId"
+	}
 	for _, filter := range filters {
 		query.Filters = append(query.Filters, p.Filter{Field: p.Text(filter, "field"), Value: filter["value"], Op: p.Text(filter, "op")})
 	}
