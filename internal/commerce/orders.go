@@ -20,6 +20,9 @@ func (a *app) orders(w http.ResponseWriter, r *http.Request) {
 	}
 	result, e := a.ReadRecords("orders", r, filters, "number", "planName", "status", "method")
 	if !c.Err(w, e) {
+		for _, row := range result.Items {
+			row["refundable"] = !p.Bool(row, "imported")
+		}
 		c.ListResponse(w, r, result)
 	}
 }
@@ -108,7 +111,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 					coupon = v
 				}
 			}
-			if coupon == nil || !p.Bool(coupon, "enabled") || p.Text(coupon, "expiresAt") != "" && p.Text(coupon, "expiresAt") < c.Now() {
+			if coupon == nil {
 				p.Fail(w, 400, "优惠码无效或已到期")
 				return
 			}
@@ -116,14 +119,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 			if c.Err(w, e) {
 				return
 			}
-			used := 0
-			for _, o := range orders {
-				if o["couponId"] == coupon["id"] && p.Text(o, "status") != "canceled" {
-					used++
-				}
-			}
-			if used >= int(p.Number(coupon, "limit")) {
-				p.Fail(w, 400, "优惠码已用完")
+			if c.Err(w, checkCoupon(coupon, plan, period, user, c.Now(), orders)) {
 				return
 			}
 			discount := p.Number(coupon, "discount")
@@ -159,6 +155,10 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 	}
 	if !c.Own(r, row) {
 		p.Fail(w, 403, "无权操作此订单")
+		return
+	}
+	if p.Bool(row, "imported") {
+		p.Fail(w, 400, "此订单已结算，不支持再次支付或自动撤销权益")
 		return
 	}
 	action := r.PathValue("action")

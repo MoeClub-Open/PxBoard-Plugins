@@ -3,7 +3,6 @@ package redeem
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -65,26 +64,16 @@ func (a *app) redeem(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "本站尚未启用余额兑换")
 		return
 	}
+	if c.Err(w, a.checkEligibility(code, user)) {
+		return
+	}
 	claim := p.Record{"id": claimID(id, user, body.RequestID), "codeId": id, "userId": user, "name": code["name"], "kind": code["kind"], "summary": codeSummary(code), "status": "pending", "createdAt": c.Now()}
+	claim["redemptionGroup"] = code["redemptionGroup"]
 	claim["reward"] = rewardFor(code, claim)
 	if c.Err(w, a.C.Put("claims", claim)) {
 		return
 	}
 	a.respondClaim(w, claim)
-}
-
-func rewardFor(code, claim p.Record) p.Record {
-	operation := "redeem-" + p.Text(claim, "id")
-	if p.Text(code, "kind") == "balance" {
-		return p.Record{"kind": "balance", "amount": code["amount"], "operationId": operation, "reason": "兑换码：" + p.Text(code, "name")}
-	}
-	grant := p.Record{"userId": claim["userId"], "grantId": operation, "kind": code["kind"]}
-	for _, field := range []string{"durationUnit", "durationValue", "quotaGiB", "unlimited", "groups", "accessLevel", "speedLimitMbps", "deviceLimit", "planFamilyId", "timezone", "resetPolicy"} {
-		if value, ok := code[field]; ok {
-			grant[field] = value
-		}
-	}
-	return p.Record{"kind": "access", "grant": grant}
 }
 
 func (a *app) respondClaim(w http.ResponseWriter, claim p.Record) {
@@ -107,12 +96,7 @@ func (a *app) completeClaim(claim p.Record) error {
 		return err
 	}
 	reward := object(claim["reward"])
-	var err error
-	if p.Text(reward, "kind") == "balance" {
-		err = a.C.Call("commerce", "POST", "/internal/wallet/credits", p.Record{"userId": claim["userId"], "amount": reward["amount"], "operationId": reward["operationId"], "reason": reward["reason"]}, nil)
-	} else {
-		err = a.C.Call("access", "POST", "/internal/grant", reward["grant"], nil)
-	}
+	err := a.deliverReward(claim, reward)
 	if err != nil {
 		claim["lastError"] = err.Error()
 		_ = a.C.Put("claims", claim)
@@ -168,28 +152,4 @@ func (a *app) claims(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(result, func(i, j int) bool { return p.Text(result[i], "createdAt") > p.Text(result[j], "createdAt") })
 	p.JSON(w, result)
-}
-
-func validateReward(claim p.Record) error {
-	if p.Text(claim, "status") == "redeemed" {
-		return nil
-	}
-	if p.Text(claim, "status") != "pending" {
-		return fmt.Errorf("兑换记录状态无效")
-	}
-	reward := object(claim["reward"])
-	switch p.Text(reward, "kind") {
-	case "balance":
-		if p.Number(reward, "amount") <= 0 || p.Text(reward, "operationId") == "" {
-			return fmt.Errorf("待完成余额兑换缺少金额或操作编号")
-		}
-	case "access":
-		grant := object(reward["grant"])
-		if p.Text(grant, "userId") != p.Text(claim, "userId") || p.Text(grant, "grantId") == "" {
-			return fmt.Errorf("待完成权益兑换缺少原始开通编号或所属用户")
-		}
-	default:
-		return fmt.Errorf("待完成兑换缺少权益快照")
-	}
-	return nil
 }

@@ -72,9 +72,21 @@ func New() http.Handler {
 		if p.Text(b, "type") == "fixed" && math.Trunc(p.Number(b, "discount")) != p.Number(b, "discount") || p.Number(b, "limit") < 0 || math.Trunc(p.Number(b, "limit")) != p.Number(b, "limit") {
 			return fmt.Errorf("固定优惠金额须为整数分，可用次数须为非负整数")
 		}
+		if p.Number(b, "perUserLimit") < 0 || math.Trunc(p.Number(b, "perUserLimit")) != p.Number(b, "perUserLimit") {
+			return fmt.Errorf("每账号可用次数须为非负整数")
+		}
 		return nil
 	})
 	a.Mux.HandleFunc("GET /orders", a.orders)
+	a.Mux.HandleFunc("GET /internal/plan-options", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Require(w, r, "redeem") {
+			return
+		}
+		families, _, err := a.planOptions()
+		if !c.Err(w, err) {
+			p.JSON(w, families)
+		}
+	})
 	a.Mux.HandleFunc("GET /public/plans", a.publicPlans)
 	a.Mux.HandleFunc("GET /period-options", a.periodOptions)
 	a.Mux.HandleFunc("GET /plans/{id}/period-options", a.periodOptions)

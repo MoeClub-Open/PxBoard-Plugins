@@ -33,4 +33,4 @@
 | `POST /internal/grant` | commerce、redeem 按业务编号开通权益 |
 | `POST /internal/revoke` | commerce 按业务编号撤销最新权益 |
 
-旧 PxBoard 分享码、充值卡及其记录的搬入方式见[兑换码数据升级](redeem-migration.md)。外部面板的原兑换码规则仅归档，不能直接作为新兑换码使用；具体范围见[迁移文档](migration.md)。
+旧 PxBoard 分享码、充值卡及其记录的搬入方式见[兑换码数据升级](redeem-migration.md)。Xboard / V2Board 的兑换码及使用记录可迁入独立兑换码模块；具体范围见[迁移文档](migration.md)。

@@ -52,5 +52,27 @@
       ]
     }
   ],
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "codes",
+      "required": [
+        "code",
+        "name",
+        "kind"
+      ],
+      "unique": [
+        "code"
+      ]
+    },
+    {
+      "collection": "claims",
+      "required": [
+        "codeId",
+        "userId",
+        "status"
+      ],
+      "userField": "userId"
+    }
+  ]
 }

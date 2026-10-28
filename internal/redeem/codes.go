@@ -19,7 +19,7 @@ func validateCode(code p.Record) error {
 	if !c.Allowed(p.Text(code, "kind"), "access", "traffic", "time", "reset", "balance") {
 		return fmt.Errorf("兑换内容无效")
 	}
-	for _, field := range []string{"limit", "perUserLimit", "historicalUses"} {
+	for _, field := range []string{"limit", "perUserLimit", "historicalUses", "groupPerUserLimit"} {
 		value := p.Number(code, field)
 		if value < 0 || math.Trunc(value) != value {
 			return fmt.Errorf("兑换次数须为非负整数")
@@ -33,6 +33,12 @@ func validateCode(code p.Record) error {
 		code["expiresAt"] = value.UTC().Format(time.RFC3339)
 	}
 	kind := p.Text(code, "kind")
+	if amount := p.Number(code, "amount"); amount < 0 || math.Trunc(amount) != amount {
+		return fmt.Errorf("余额金额须为非负整数分")
+	}
+	if p.Number(code, "cooldownHours") < 0 || p.Number(code, "groupPerUserLimit") > 0 && p.Text(code, "redemptionGroup") == "" {
+		return fmt.Errorf("请填写有效的领取间隔和限次分组")
+	}
 	if kind == "balance" {
 		if amount := p.Number(code, "amount"); amount <= 0 || math.Trunc(amount) != amount {
 			return fmt.Errorf("余额金额须为正整数分")
@@ -40,7 +46,7 @@ func validateCode(code p.Record) error {
 	}
 	if kind == "access" || kind == "time" {
 		unit, duration := p.Text(code, "durationUnit"), p.Number(code, "durationValue")
-		if unit != "permanent" && (!c.Allowed(unit, "day", "month") || duration <= 0 || math.Trunc(duration) != duration) {
+		if unit != "permanent" && !(kind == "access" && unit == "unchanged") && (!c.Allowed(unit, "day", "month") || duration <= 0 || math.Trunc(duration) != duration) {
 			return fmt.Errorf("请填写有效的期限")
 		}
 	}
@@ -75,7 +81,7 @@ func (a *app) normalizeCode(_ *http.Request, values, old p.Record) error {
 	if err := validateCode(values); err != nil {
 		return err
 	}
-	if p.Text(values, "kind") == "balance" && !a.walletAvailable() {
+	if p.Number(values, "amount") > 0 && !a.walletAvailable() {
 		return fmt.Errorf("余额兑换码需要安装并启用商业运营插件")
 	}
 	match, err := a.find("codes", "code", p.Text(values, "code"))
@@ -175,6 +181,17 @@ func (a *app) deleteCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func codeSummary(code p.Record) string {
+	if p.Bool(code, "reviewRequired") {
+		return "需要核对奖励配置"
+	}
+	text := accessSummary(code)
+	if p.Text(code, "kind") != "balance" && p.Number(code, "amount") > 0 {
+		text += fmt.Sprintf(" + 余额 %.2f", p.Number(code, "amount")/100)
+	}
+	return text
+}
+
+func accessSummary(code p.Record) string {
 	switch p.Text(code, "kind") {
 	case "balance":
 		return fmt.Sprintf("余额 %.2f", p.Number(code, "amount")/100)
@@ -190,6 +207,9 @@ func codeSummary(code p.Record) string {
 }
 
 func codeDuration(code p.Record) string {
+	if p.Text(code, "durationUnit") == "unchanged" {
+		return "保留当前期限"
+	}
 	if p.Text(code, "durationUnit") == "permanent" {
 		return "长期"
 	}

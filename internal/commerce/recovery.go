@@ -26,6 +26,9 @@ func (a *app) tick() error {
 		}
 	}
 	for _, row := range orders {
+		if p.Bool(row, "imported") {
+			continue
+		}
 		var err error
 		switch p.Text(row, "status") {
 		case "paid":

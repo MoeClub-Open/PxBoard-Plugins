@@ -121,6 +121,9 @@ func (m *mapper) v2Users() {
 	for _, row := range rows {
 		group := m.group(text(row, "group_id"))
 		account := p.Record{"quotaGiB": number(row, "transfer_enable") / 1073741824, "groups": group, "expiresAt": m.timeValue(row, "expired_at"), "speedLimitMbps": integer(row, "speed_limit"), "deviceLimit": integer(row, "device_limit"), "planSourceId": text(row, "plan_id"), "planFamilyId": m.id("plan-family", text(row, "plan_id")), "resetPolicy": m.v2ResetPolicy(row)}
+		if text(row, "plan_id") == "" || text(row, "plan_id") == "0" {
+			account["planFamilyId"] = ""
+		}
 		if row["expired_at"] != nil && text(row, "expired_at") == "0" {
 			account["expiresAt"] = time.Unix(0, 0).UTC().Format(time.RFC3339)
 		}

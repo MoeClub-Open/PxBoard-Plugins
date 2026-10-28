@@ -21,7 +21,9 @@
     "import:commerce",
     "import:affiliate",
     "import:subscriptions",
-    "import:import-xboard"
+    "import:import-xboard",
+    "import:support",
+    "import:redeem"
   ],
   "pages": [
     {
@@ -52,6 +54,19 @@
     "nodes": [
       "nodes",
       "machines"
+    ],
+    "commerce": [
+      "orders",
+      "coupons"
+    ],
+    "support": [
+      "tickets",
+      "announcements",
+      "articles"
+    ],
+    "redeem": [
+      "codes",
+      "claims"
     ]
   }
 }

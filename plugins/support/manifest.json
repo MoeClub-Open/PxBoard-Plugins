@@ -53,5 +53,30 @@
     "beforeVersion": "1.3.0",
     "required": true
   },
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "tickets",
+      "required": [
+        "subject",
+        "userId",
+        "status"
+      ],
+      "userField": "userId"
+    },
+    {
+      "collection": "announcements",
+      "required": [
+        "title",
+        "content"
+      ]
+    },
+    {
+      "collection": "articles",
+      "required": [
+        "title",
+        "content"
+      ]
+    }
+  ]
 }

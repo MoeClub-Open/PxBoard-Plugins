@@ -81,7 +81,9 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		}
 		base = base.In(zone)
 		unit, count := p.Text(b, "durationUnit"), int(p.Number(b, "durationValue"))
-		if unit == "permanent" {
+		if unit == "unchanged" && p.Text(b, "kind") != "time" {
+			// Assigning a plan need not extend its existing expiry.
+		} else if unit == "permanent" {
 			row["expiresAt"] = ""
 		} else if unit == "month" && count > 0 {
 			row["expiresAt"] = addMonths(base, count).UTC().Format(time.RFC3339)
@@ -92,7 +94,7 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if p.Text(b, "kind") != "time" {
-			if p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") || p.Text(b, "planFamilyId") == "" {
+			if !p.Bool(b, "preserveUsage") && (p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") || p.Text(b, "planFamilyId") == "") {
 				row["cycleStart"] = cycleNow()
 			}
 			for _, key := range []string{"quotaGiB", "unlimited", "groups", "accessLevel", "speedLimitMbps", "deviceLimit", "planFamilyId"} {

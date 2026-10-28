@@ -26,7 +26,7 @@ func planResource() p.Resource {
 	}}
 }
 func couponResource() p.Resource {
-	f := []p.Field{c.Field("code", "优惠码", "text", true), c.Select("type", "优惠方式", "percent|减免百分比", "fixed|固定金额"), c.Field("discount", "优惠额度", "discount", true), c.Field("limit", "可用次数", "number", true), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}
+	f := []p.Field{c.Field("code", "优惠码", "text", true), c.Select("type", "优惠方式", "percent|减免百分比", "fixed|固定金额"), c.Field("discount", "优惠额度", "discount", true), c.Field("limit", "总次数（0为不限）", "number", true), c.Field("expiresAt", "到期时间", "datetime", false), c.Field("enabled", "启用", "boolean", false)}
 	f[1].Default = "percent"
 	f[2].Default = 10
 	f[3].Default = 100
@@ -64,6 +64,7 @@ func (a *app) orderView(r *http.Request) (p.View, error) {
 	}
 	if p.Admin(r) {
 		actions = append(actions, p.Action{Key: "confirm", Label: "确认收款", Confirm: "确认已在外部实际收到这笔款项？", When: map[string][]string{"status": {"pending", "paid"}}}, p.Action{Key: "refund", Label: "退回余额", Danger: true, Confirm: "撤销该订单的访问权益，并将金额退回账户余额？", When: map[string][]string{"status": {"fulfilled", "refunding"}, "kind": {"subscription", "time", "traffic", "reset"}}})
+		actions[len(actions)-1].When["refundable"] = []string{"true"}
 	}
 	orders, e := a.Filter("orders", func(row p.Record) bool { return c.Own(r, row) })
 	if e != nil {
@@ -100,6 +101,12 @@ func (a *app) couponView(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
 		return p.View{}, problemPermission()
 	}
-	return p.View{Title: "优惠码", Resources: []p.Resource{couponResource()}}, nil
+	resource := couponResource()
+	families, periods, err := a.planOptions()
+	if err != nil {
+		return p.View{}, err
+	}
+	resource.Fields = append(resource.Fields, c.Field("startsAt", "开始时间", "datetime", false), c.Field("perUserLimit", "每账号次数（0为不限）", "number", false), p.Field{Key: "planFamilyIds", Label: "适用套餐", Type: "multiselect", Options: families}, p.Field{Key: "periodIds", Label: "适用购买周期", Type: "multiselect", Options: periods})
+	return p.View{Title: "优惠码", Resources: []p.Resource{resource}}, nil
 }
 func problemPermission() error { return fmt.Errorf("仅管理员可管理此功能") }

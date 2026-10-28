@@ -65,6 +65,15 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b["id"] = p.ID()
+	for _, key := range []string{"includeHistory", "includeSupport", "includeRedeem"} {
+		if _, exists := b[key]; !exists {
+			b[key] = true
+		}
+	}
+	if scope := p.Text(b, "scope"); scope != "" && scope != "full" && scope != "business" {
+		p.Fail(w, 400, "迁移范围无效")
+		return
+	}
 	b["seed"] = p.ID() + p.ID()
 	b["status"] = "created"
 	b["createdAt"] = c.Now()
@@ -183,7 +192,7 @@ func (a *app) prepare(job p.Record) error {
 	job["sourceId"] = snapshot.SourceID
 	job["snapshotPath"] = path
 	delete(job, "dsn")
-	plan, e := Build(snapshot, a.ID, Options{IncludeNodes: p.Bool(job, "includeNodes"), IncludeAffiliate: p.Bool(job, "includeAffiliate"), IncludeRoutes: p.Bool(job, "includeRoutes"), IncludeTemplates: p.Bool(job, "includeTemplates"), PasswordMethod: p.Text(job, "passwordMethod"), PasswordSalt: p.Text(job, "passwordSalt"), SystemResetMethod: p.Text(job, "systemResetMethod"), Seed: p.Text(job, "seed")})
+	plan, e := Build(snapshot, a.ID, Options{Scope: p.Text(job, "scope"), IncludeHistory: p.Bool(job, "includeHistory"), IncludeSupport: p.Bool(job, "includeSupport"), IncludeRedeem: p.Bool(job, "includeRedeem"), IncludeNodes: p.Bool(job, "includeNodes"), IncludeAffiliate: p.Bool(job, "includeAffiliate"), IncludeRoutes: p.Bool(job, "includeRoutes"), IncludeTemplates: p.Bool(job, "includeTemplates"), PasswordMethod: p.Text(job, "passwordMethod"), PasswordSalt: p.Text(job, "passwordSalt"), SystemResetMethod: p.Text(job, "systemResetMethod"), Seed: p.Text(job, "seed")})
 	if e != nil {
 		return e
 	}

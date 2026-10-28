@@ -29,7 +29,7 @@ func (a *app) checkout(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 403, "无权支付此订单")
 		return
 	}
-	if p.Text(order, "status") != "pending" {
+	if p.Text(order, "status") != "pending" || p.Bool(order, "imported") {
 		p.Fail(w, 400, "订单已支付或已关闭")
 		return
 	}

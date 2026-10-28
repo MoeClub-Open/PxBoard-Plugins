@@ -16,6 +16,10 @@ import (
 var sourcePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 type Options struct {
+	Scope             string `json:"scope"`
+	IncludeHistory    bool   `json:"includeHistory"`
+	IncludeSupport    bool   `json:"includeSupport"`
+	IncludeRedeem     bool   `json:"includeRedeem"`
 	IncludeNodes      bool   `json:"includeNodes"`
 	IncludeAffiliate  bool   `json:"includeAffiliate"`
 	IncludeRoutes     bool   `json:"includeRoutes"`
@@ -56,6 +60,22 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	}
 	plan := &Plan{SourceID: snapshot.SourceID, Mapped: map[string]int{}, ArchiveOnly: map[string]int{}, Warnings: []string{}, Errors: []string{}, Rows: []p.ImportRow{}}
 	m := &mapper{S: snapshot, Options: options, Plan: plan, Users: map[string]bool{}, Machines: map[string]bool{}, Groups: map[string]string{}, MFA: map[string]string{}, UsedTables: map[string]bool{}}
+	if options.Scope == "business" {
+		if snapshot.Source != "xboard" && snapshot.Source != "v2board" {
+			return nil, fmt.Errorf("补充业务数据目前支持 Xboard 和 V2Board")
+		}
+		for _, row := range snapshot.Rows("v2_user") {
+			m.Users[text(row, "id")] = true
+		}
+		if options.IncludeHistory {
+			m.checkPendingOrders()
+		}
+		m.v2Business()
+		for _, table := range snapshot.Tables {
+			plan.SourceRows += len(table.Rows)
+		}
+		return plan, nil
+	}
 	if snapshot.Source == "xboard" || snapshot.Source == "v2board" {
 		for _, row := range snapshot.Rows("v2_server_group") {
 			id, name := text(row, "id"), strings.TrimSpace(text(row, "name"))
@@ -74,6 +94,7 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	} else if snapshot.Source == "v2board" || snapshot.Source == "xboard" {
 		m.v2Users()
 		m.v2Plans()
+		m.v2Business()
 		if options.IncludeRoutes {
 			m.v2Routes()
 		}
@@ -96,7 +117,7 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	if !options.IncludeAffiliate {
 		m.warning("未选择推广插件：原推广关系、个人返佣规则和购买历史仅归档，不在目标启用；非零可用佣金会阻断导入。")
 	}
-	m.warning("历史订单、支付、优惠、审计和未选择的旧系统设置仅保存原始记录，不自动启用；原兑换码与邀请码仅归档，不能在 PxBoard 直接兑换或使用。用户余额和套餐权益单独转换，订阅令牌保持不变。")
+	m.warning("支付渠道、审计、邀请码和未选择的系统设置保留原始记录，不自动启用。已完成订单不重新发放权益；已兑换记录不重新入账。")
 	for _, name := range snapshot.Names() {
 		table := snapshot.Tables[name]
 		plan.SourceRows += len(table.Rows)

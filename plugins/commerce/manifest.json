@@ -78,5 +78,29 @@
   "name": "套餐与订单",
   "summary": true,
   "minCoreVersion": "1!0.0.1",
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "orders",
+      "required": [
+        "number",
+        "status",
+        "userId"
+      ],
+      "unique": [
+        "number"
+      ],
+      "userField": "userId"
+    },
+    {
+      "collection": "coupons",
+      "required": [
+        "code",
+        "type"
+      ],
+      "unique": [
+        "code"
+      ]
+    }
+  ]
 }
