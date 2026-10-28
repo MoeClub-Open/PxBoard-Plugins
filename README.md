@@ -50,6 +50,8 @@ go build -o bin/px-agent ./cmd/agent
 
 ## 数据迁移与升级
 
+当前开发构建的核心接口与插件应成套更新。旧订单、工单通知标记的一次性转换见[记录与事件提交升级](docs/runtime-upgrade.md)。
+
 迁移插件支持读取只读 MySQL 数据库或由 `cmd/export-migration` 生成的完整快照。默认转换用户与套餐等主要数据，节点和机器可选；提交前提供预览与冲突检查，未转换的旧表保留归档。使用方法、字段单位、套餐核对及恢复操作见 [迁移文档](docs/migration.md)。第三方客户端和 OAuth 数据不走面板导入插件，OAuth 的独立手动搬入工具见 [OAuth 文档](docs/oauth.md)。
 
 已有 PxBoard 的旧分享码、充值卡和兑换历史通过[兑换码数据升级](docs/redeem-migration.md)搬入独立兑换码插件；旧商业插件中的推广关系、佣金及提现记录通过[推广数据升级](docs/affiliate.md#从旧商业插件拆出数据)搬入独立推广插件。外部面板的原兑换码规则目前仅归档，不会自动激活。

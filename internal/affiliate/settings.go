@@ -70,7 +70,7 @@ func (a *app) saveProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "PATCH" {
 		user = r.PathValue("id")
 	}
-	users, e := a.C.Users()
+	users, e := a.C.UsersByID(user)
 	if c.Err(w, e) {
 		return
 	}

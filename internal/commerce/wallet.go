@@ -8,7 +8,7 @@ import (
 )
 
 func (a *app) balance(user string) (float64, error) {
-	rows, e := a.records("ledger", p.Record{"field": "userId", "value": user})
+	rows, e := a.QueryAll("ledger", p.Record{"field": "userId", "value": user})
 	sum := 0.0
 	for _, row := range rows {
 		if row["userId"] == user {
@@ -21,9 +21,9 @@ func (a *app) ledger(w http.ResponseWriter, r *http.Request) {
 	if !c.Member(w, r) {
 		return
 	}
-	rows, e := a.Filter("ledger", func(row p.Record) bool { return c.OwnList(r, row) })
+	result, e := a.ReadRecords("ledger", r, c.OwnerFilters(r), "userId", "reason")
 	if !c.Err(w, e) {
-		p.JSON(w, rows)
+		c.ListResponse(w, r, result)
 	}
 }
 func (a *app) adjust(w http.ResponseWriter, r *http.Request) {

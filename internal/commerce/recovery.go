@@ -8,16 +8,16 @@ import (
 )
 
 func (a *app) walletDebited(order p.Record) (bool, error) {
-	rows, e := a.records("ledger", p.Record{"field": "id", "value": "order-" + p.Text(order, "id")})
+	rows, e := a.QueryAll("ledger", p.Record{"field": "id", "value": "order-" + p.Text(order, "id")})
 	return len(rows) > 0, e
 }
 
 func (a *app) tick() error {
 	var failures []error
 	orders := map[string]p.Record{}
-	filters := []p.Record{{"field": "status", "value": "paid"}, {"field": "status", "value": "refunding"}, {"field": "status", "value": "pending"}, {"field": "notificationPending", "value": true}, {"field": "refundNotificationPending", "value": true}}
+	filters := []p.Record{{"field": "status", "value": "paid"}, {"field": "status", "value": "refunding"}, {"field": "status", "value": "pending"}}
 	for _, filter := range filters {
-		rows, e := a.records("orders", filter)
+		rows, e := a.QueryAll("orders", filter)
 		if e != nil {
 			return e
 		}
@@ -43,14 +43,6 @@ func (a *app) tick() error {
 				row["status"] = "canceled"
 				err = a.C.Put("orders", row)
 			}
-		case "fulfilled":
-			if p.Bool(row, "notificationPending") {
-				err = a.notifyFulfilled(row)
-			}
-		case "refunded":
-			if p.Bool(row, "refundNotificationPending") {
-				err = a.notifyRefunded(row)
-			}
 		}
 		if err != nil {
 			failures = append(failures, fmt.Errorf("订单 %s：%w", p.Text(row, "number"), err))
@@ -64,7 +56,7 @@ func (a *app) paymentReview(data p.Record, reason string) error {
 }
 
 func (a *app) paymentSucceeded(data p.Record) error {
-	orders, e := a.records("orders", p.Record{"field": "id", "value": p.Text(data, "orderId")})
+	orders, e := a.QueryAll("orders", p.Record{"field": "id", "value": p.Text(data, "orderId")})
 	if e != nil {
 		return e
 	}

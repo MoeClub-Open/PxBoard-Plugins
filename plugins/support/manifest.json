@@ -1,8 +1,6 @@
 {
   "id": "support",
-  "events": [
-    "system.tick"
-  ],
+  "events": [],
   "apiVersion": "1.0",
   "name": "用户服务",
   "permissions": [

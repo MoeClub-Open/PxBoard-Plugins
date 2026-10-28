@@ -10,9 +10,12 @@ import (
 )
 
 type App struct {
-	C   *p.Client
-	Mux *http.ServeMux
+	C          *p.Client
+	Mux        *http.ServeMux
+	Concurrent []string
 }
+
+func (a *App) ConcurrentPaths() []string { return a.Concurrent }
 
 func (a *App) Summary(fn func(*http.Request) ([]p.Metric, error)) {
 	a.Mux.HandleFunc("GET /summary", func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +29,7 @@ func (a *App) Summary(fn func(*http.Request) ([]p.Metric, error)) {
 	})
 }
 
-func New() *App                                                 { return &App{p.NewClient(), http.NewServeMux()} }
+func New() *App                                                 { return &App{C: p.NewClient(), Mux: http.NewServeMux()} }
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) { a.Mux.ServeHTTP(w, r) }
 func Err(w http.ResponseWriter, e error) bool {
 	if e != nil {
@@ -56,16 +59,7 @@ func Member(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 func (a *App) Find(collection, id string) (p.Record, error) {
-	rows, e := a.C.List(collection)
-	if e != nil {
-		return nil, e
-	}
-	for _, r := range rows {
-		if p.Text(r, "id") == id {
-			return r, nil
-		}
-	}
-	return nil, fmt.Errorf("记录不存在")
+	return a.C.Get(collection, id)
 }
 func (a *App) Filter(collection string, keep func(p.Record) bool) ([]p.Record, error) {
 	rows, e := a.C.List(collection)
@@ -222,13 +216,21 @@ func Select(key, label string, options ...string) p.Field {
 	}
 	return f
 }
-func UserField(c *p.Client) p.Field {
-	f := Field("userId", "用户", "select", true)
-	users, _ := c.Users()
-	for _, u := range users {
-		f.Options = append(f.Options, p.Option{Label: p.Text(u, "email"), Value: u["id"]})
+func UserField() p.Field {
+	return p.Field{Key: "userId", Label: "用户", Type: "select", Required: true, OptionsEndpoint: "/api/v1/users/options", OptionsSearch: true}
+}
+
+func (a *App) UsersFor(rows []p.Record, field string) ([]p.Record, error) {
+	seen := map[string]bool{}
+	ids := []string{}
+	for _, row := range rows {
+		id := p.Text(row, field)
+		if id != "" && !seen[id] {
+			ids = append(ids, id)
+			seen[id] = true
+		}
 	}
-	return f
+	return a.C.UsersByID(ids...)
 }
 func Own(r *http.Request, row p.Record) bool {
 	return p.Admin(r) || p.Text(row, "userId") == p.Subject(r).ID

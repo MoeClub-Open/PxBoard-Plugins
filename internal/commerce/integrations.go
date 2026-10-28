@@ -1,7 +1,6 @@
 package commerce
 
 import (
-	"fmt"
 	"math"
 	"net/http"
 
@@ -9,36 +8,8 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-func (a *app) Find(collection, id string) (p.Record, error) {
-	rows, e := a.records(collection, p.Record{"field": "id", "value": id})
-	if e != nil {
-		return nil, e
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("记录不存在")
-	}
-	return rows[0], nil
-}
-
-func (a *app) records(collection string, filters ...p.Record) ([]p.Record, error) {
-	items := []p.Record{}
-	for offset := 0; ; offset += 1000 {
-		var page struct {
-			Items []p.Record `json:"items"`
-			Total int        `json:"total"`
-		}
-		if e := a.C.Request("POST", "/api/v1/runtime/query", p.Record{"collection": collection, "filters": filters, "offset": offset, "limit": 1000}, &page); e != nil {
-			return nil, e
-		}
-		items = append(items, page.Items...)
-		if len(items) >= page.Total {
-			return items, nil
-		}
-	}
-}
-
 func (a *app) config() (p.Record, error) {
-	rows, e := a.records("settings", p.Record{"field": "id", "value": "settings"})
+	rows, e := a.QueryAll("settings", p.Record{"field": "id", "value": "settings"})
 	if e != nil || len(rows) == 0 {
 		return p.Record{"id": "settings"}, e
 	}
@@ -46,7 +17,7 @@ func (a *app) config() (p.Record, error) {
 }
 
 func (a *app) customer(user string) (p.Record, error) {
-	rows, e := a.records("customers", p.Record{"field": "userId", "value": user})
+	rows, e := a.QueryAll("customers", p.Record{"field": "userId", "value": user})
 	if e != nil || len(rows) == 0 {
 		return p.Record{}, e
 	}
@@ -61,7 +32,7 @@ func (a *app) internalOrders(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "缺少用户标识")
 		return
 	}
-	rows, e := a.records("orders", p.Record{"field": "userId", "value": r.URL.Query().Get("userId")})
+	rows, e := a.QueryAll("orders", p.Record{"field": "userId", "value": r.URL.Query().Get("userId")})
 	if c.Err(w, e) {
 		return
 	}
@@ -109,7 +80,7 @@ func (a *app) internalCredit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := "external:" + p.Subject(r).Plugin + ":" + p.Text(b, "operationId")
-	existing, e := a.records("ledger", p.Record{"field": "id", "value": id})
+	existing, e := a.QueryAll("ledger", p.Record{"field": "id", "value": id})
 	if c.Err(w, e) {
 		return
 	}
@@ -122,7 +93,7 @@ func (a *app) internalCredit(w http.ResponseWriter, r *http.Request) {
 		p.JSON(w, p.Record{"credited": true, "duplicate": true})
 		return
 	}
-	users, e := a.C.Users()
+	users, e := a.C.UsersByID(p.Text(b, "userId"))
 	if c.Err(w, e) {
 		return
 	}

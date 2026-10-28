@@ -49,7 +49,7 @@ func (a *app) settingsView(r *http.Request) (p.View, error) {
 		return p.View{}, fmt.Errorf("仅管理员可修改推广设置")
 	}
 	settings := []p.Field{c.Field("commissionPercent", "返佣比例（%）", "number", true), c.Field("commissionHoldDays", "佣金冻结（天）", "number", true), c.Field("commissionFirstPurchaseOnly", "仅首次购买返佣", "boolean", false)}
-	profile := []p.Field{c.UserField(a.C), c.Field("commissionPercent", "个人比例（留空跟随系统）", "number", false), c.Select("commissionMode", "返佣方式", "system|跟随系统", "recurring|持续返佣", "firstPurchase|仅首次购买")}
+	profile := []p.Field{c.UserField(), c.Field("commissionPercent", "个人比例（留空跟随系统）", "number", false), c.Select("commissionMode", "返佣方式", "system|跟随系统", "recurring|持续返佣", "firstPurchase|仅首次购买")}
 	profile[2].Default = "system"
 	return p.View{Title: "推广设置", Resources: []p.Resource{{Key: "settings", Singleton: true, Title: "推广规则", Endpoint: "/settings", Editable: true, Fields: settings, Columns: settings}, {Key: "profiles", Title: "个人规则", Endpoint: "/profiles", CreateLabel: "设置个人规则", Editable: true, Fields: profile, Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("commissionPercent", "个人比例（%）", "number", false), c.Field("commissionMode", "返佣方式", "tag", false), c.Field("hasPriorPurchase", "迁移前有购买记录", "boolean", false)}}}}, nil
 }

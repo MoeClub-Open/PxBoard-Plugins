@@ -38,18 +38,7 @@ func (a *app) fulfill(row p.Record) error {
 	}
 	row["status"] = "fulfilled"
 	row["fulfilledAt"] = c.Now()
-	row["notificationPending"] = true
-	if e := a.C.Put("orders", row); e != nil {
-		return e
-	}
-	return a.notifyFulfilled(row)
-}
-func (a *app) notifyFulfilled(row p.Record) error {
-	if e := a.C.Emit("order.fulfilled", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"], "kind": row["kind"], "paidAt": row["paidAt"], "fulfilledAt": row["fulfilledAt"]}); e != nil {
-		return e
-	}
-	row["notificationPending"] = false
-	return a.C.Put("orders", row)
+	return a.C.Commit("order-fulfilled:"+p.Text(row, "id"), []p.Write{{Collection: "orders", Record: row}}, p.Emission{Type: "order.fulfilled", Data: p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"], "kind": row["kind"], "paidAt": row["paidAt"], "fulfilledAt": row["fulfilledAt"]}})
 }
 func (a *app) refund(row p.Record) error {
 	if p.Text(row, "kind") == "recharge" {
@@ -64,17 +53,5 @@ func (a *app) refund(row p.Record) error {
 	}
 	row["status"] = "refunded"
 	row["refundedAt"] = c.Now()
-	row["refundNotificationPending"] = true
-	if e := a.C.Put("orders", row); e != nil {
-		return e
-	}
-	return a.notifyRefunded(row)
-}
-
-func (a *app) notifyRefunded(row p.Record) error {
-	if e := a.C.Emit("order.refunded", p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "refundedAt": row["refundedAt"]}); e != nil {
-		return e
-	}
-	row["refundNotificationPending"] = false
-	return a.C.Put("orders", row)
+	return a.C.Commit("order-refunded:"+p.Text(row, "id"), []p.Write{{Collection: "orders", Record: row}}, p.Emission{Type: "order.refunded", Data: p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "refundedAt": row["refundedAt"]}})
 }

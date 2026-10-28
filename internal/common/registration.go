@@ -20,15 +20,12 @@ func (a *App) PublishRegistration(collection string, row p.Record) error {
 	if referral := p.Text(row, "referral"); referral != "" {
 		data["referral"] = referral
 	}
-	if e := a.C.Emit("account.registered", data); e != nil {
-		return e
-	}
 	row["registrationPending"], row["registrationEmittedAt"] = false, Now()
-	return a.C.Put(collection, row)
+	return a.C.Commit("registration:"+user, []p.Write{{Collection: collection, Record: row}}, p.Emission{Type: "account.registered", Data: data})
 }
 
 func (a *App) RetryRegistrations(collection string) error {
-	rows, e := a.C.List(collection)
+	rows, e := a.QueryAll(collection, p.Record{"field": "registrationPending", "value": true})
 	if e != nil {
 		return e
 	}

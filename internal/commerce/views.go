@@ -56,7 +56,7 @@ func (a *app) orderView(r *http.Request) (p.View, error) {
 	f.OptionsEndpoint = "/api/v1/extensions/commerce/period-options"
 	fields := []p.Field{f, c.Field("coupon", "优惠码", "text", false)}
 	if p.Admin(r) {
-		fields = append([]p.Field{c.UserField(a.C)}, fields...)
+		fields = append([]p.Field{c.UserField()}, fields...)
 	}
 	actions := []p.Action{{Key: "pay", Label: "余额支付", Confirm: "使用账户余额支付此订单？", When: map[string][]string{"status": {"pending", "paid"}, "kind": {"subscription", "time", "traffic", "reset"}}}, {Key: "cancel", Label: "取消", Confirm: "取消此订单？", When: map[string][]string{"status": {"pending"}}}}
 	if checkout := a.checkoutAction(); checkout != nil {
@@ -78,17 +78,17 @@ func (a *app) orderView(r *http.Request) (p.View, error) {
 			pending++
 		}
 	}
-	return p.View{Title: "订单", Metrics: []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}}, Resources: []p.Resource{{Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "实付金额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}}}, nil
+	return p.View{Title: "订单", Metrics: []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}}, Resources: []p.Resource{{Paginated: true, Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "实付金额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}}}, nil
 }
 func (a *app) walletView(r *http.Request) (p.View, error) {
 	balance, e := a.balance(p.Subject(r).ID)
 	if e != nil {
 		return p.View{}, e
 	}
-	res := p.Resource{Key: "ledger", Title: "余额明细", Endpoint: "/ledger", Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("amount", "变动金额", "money", false), c.Field("reason", "原因", "text", false), c.Field("createdAt", "时间", "datetime", false)}}
+	res := p.Resource{Paginated: true, Key: "ledger", Title: "余额明细", Endpoint: "/ledger", Columns: []p.Field{c.Field("userId", "用户 ID", "text", false), c.Field("amount", "变动金额", "money", false), c.Field("reason", "原因", "text", false), c.Field("createdAt", "时间", "datetime", false)}}
 	if p.Admin(r) {
 		res.CreateLabel = "调整余额"
-		res.Fields = []p.Field{c.UserField(a.C), c.Field("amount", "调整金额（扣款填负数）", "money", true), c.Field("reason", "调整原因", "text", true)}
+		res.Fields = []p.Field{c.UserField(), c.Field("amount", "调整金额（扣款填负数）", "money", true), c.Field("reason", "调整原因", "text", true)}
 	}
 	actions := []p.Action{}
 	if checkout := a.checkoutAction(); checkout != nil {

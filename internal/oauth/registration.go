@@ -61,7 +61,7 @@ func (a *app) registerIdentity(provider p.Record, profile identity, email, passw
 	if !strings.Contains(email, "@") || len(password) < 10 {
 		return "", fmt.Errorf("请输入有效邮箱和至少 10 位密码")
 	}
-	users, e := a.C.Users()
+	users, e := a.C.UsersByEmail(email)
 	if e != nil {
 		return "", e
 	}

@@ -64,7 +64,8 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 	if !p.Admin(r) || r.URL.Query().Get("mine") == "1" {
 		filters = append(filters, p.Record{"field": "userId", "value": p.Subject(r).ID})
 	}
-	rows, e := a.queryLinks(filters)
+	result, e := a.ReadRecords("links", r, filters, "name", "userId", "boundClient")
+	rows := result.Items
 	if c.Err(w, e) {
 		return
 	}
@@ -72,7 +73,7 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, e) {
 		return
 	}
-	users, e := a.C.Users()
+	users, e := a.UsersFor(rows, "userId")
 	if c.Err(w, e) {
 		return
 	}
@@ -118,7 +119,8 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 		row["singboxUrl"] = base + "?format=sing-box"
 		row["shareUrl"] = base
 	}
-	p.JSON(w, rows)
+	result.Items = rows
+	c.ListResponse(w, r, result)
 }
 
 func (a *app) rotate(w http.ResponseWriter, r *http.Request) {

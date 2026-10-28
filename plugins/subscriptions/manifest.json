@@ -34,5 +34,19 @@
     }
   ],
   "minCoreVersion": "1!0.0.1",
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "links",
+      "required": [
+        "userId",
+        "token"
+      ],
+      "unique": [
+        "token"
+      ],
+      "userField": "userId"
+    }
+  ],
+  "publicRouteTarget": "/s"
 }

@@ -40,5 +40,17 @@
     }
   ],
   "minCoreVersion": "1!0.0.1",
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "requiredImportRules": {
+    "access": [
+      "accounts"
+    ],
+    "subscriptions": [
+      "links"
+    ],
+    "nodes": [
+      "nodes",
+      "machines"
+    ]
+  }
 }

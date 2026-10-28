@@ -28,7 +28,7 @@ func (a *app) registerReferral(data p.Record) error {
 	if e != nil {
 		return e
 	}
-	users, e := a.C.Users()
+	users, e := a.C.UsersByID(user, parent)
 	if e != nil {
 		return e
 	}

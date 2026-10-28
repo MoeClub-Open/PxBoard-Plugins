@@ -10,6 +10,7 @@ type app struct{ *c.App }
 
 func New() http.Handler {
 	a := &app{c.New()}
+	a.Concurrent = []string{"POST /checkout", "GET /channels"}
 	a.Mux.HandleFunc("GET /channels", a.channels)
 	a.Mux.HandleFunc("POST /channels", a.save)
 	a.Mux.HandleFunc("PATCH /channels/{id}", a.save)

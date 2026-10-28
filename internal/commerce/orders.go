@@ -14,11 +14,13 @@ func (a *app) orders(w http.ResponseWriter, r *http.Request) {
 	if !c.Member(w, r) {
 		return
 	}
-	rows, e := a.Filter("orders", func(row p.Record) bool {
-		return c.OwnList(r, row) && (r.URL.Query().Get("kind") == "" || p.Text(row, "kind") == r.URL.Query().Get("kind"))
-	})
+	filters := c.OwnerFilters(r)
+	if kind := r.URL.Query().Get("kind"); kind != "" {
+		filters = append(filters, p.Record{"field": "kind", "value": kind})
+	}
+	result, e := a.ReadRecords("orders", r, filters, "number", "planName", "status", "method")
 	if !c.Err(w, e) {
-		p.JSON(w, rows)
+		c.ListResponse(w, r, result)
 	}
 }
 func (a *app) order(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +38,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 	requestID := p.Text(b, "requestId")
 	intent := map[string]any{"planId": p.Text(b, "planId"), "periodId": p.Text(b, "periodId"), "kind": p.Text(b, "kind"), "amount": p.Number(b, "amount"), "coupon": strings.TrimSpace(p.Text(b, "coupon"))}
 	if requestID != "" {
-		orders, e := a.records("orders", p.Record{"field": "userId", "value": user}, p.Record{"field": "requestId", "value": requestID})
+		orders, e := a.QueryAll("orders", p.Record{"field": "userId", "value": user}, p.Record{"field": "requestId", "value": requestID})
 		if c.Err(w, e) {
 			return
 		}

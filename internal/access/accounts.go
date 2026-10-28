@@ -53,7 +53,7 @@ func (a *app) enrichedFor(user string) ([]p.Record, error) {
 	if e != nil {
 		return nil, e
 	}
-	users, e := a.C.Users()
+	users, e := a.UsersFor(rows, "userId")
 	if e != nil {
 		return nil, e
 	}

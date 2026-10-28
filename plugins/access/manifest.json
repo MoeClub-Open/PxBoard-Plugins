@@ -32,5 +32,21 @@
   ],
   "summary": true,
   "minCoreVersion": "1!0.0.1",
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "accounts",
+      "required": [
+        "userId",
+        "credential",
+        "numericId"
+      ],
+      "unique": [
+        "userId",
+        "credential",
+        "numericId"
+      ],
+      "userField": "userId"
+    }
+  ]
 }

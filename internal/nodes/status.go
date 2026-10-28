@@ -246,5 +246,5 @@ func (a *app) statusView(r *http.Request) (p.View, error) {
 			}
 		}
 	}
-	return p.View{Title: "节点状态", Resources: []p.Resource{{Key: "status", Title: "节点", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无可查看的节点"}}}, nil
+	return p.View{Title: "节点状态", Resources: []p.Resource{{Renderer: "node-status", Key: "status", Title: "节点", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无可查看的节点"}}}, nil
 }

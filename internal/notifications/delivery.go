@@ -38,7 +38,7 @@ func (a *app) event(e p.Event) error {
 			return nil
 		}
 	}
-	users, err := a.C.Users()
+	users, err := a.C.UsersByID(p.Text(e.Data, "userId"))
 	if err != nil {
 		return err
 	}

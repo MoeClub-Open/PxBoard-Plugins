@@ -66,5 +66,25 @@
   "capabilities": [
     "portal.status"
   ],
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "importRules": [
+    {
+      "collection": "nodes",
+      "required": [
+        "wireId"
+      ],
+      "unique": [
+        "wireId"
+      ]
+    },
+    {
+      "collection": "machines",
+      "required": [
+        "number"
+      ],
+      "unique": [
+        "number"
+      ]
+    }
+  ]
 }

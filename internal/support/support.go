@@ -3,7 +3,6 @@ package support
 import (
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
-	"log"
 	"net/http"
 )
 
@@ -24,16 +23,15 @@ func New() http.Handler {
 	a.Mux.HandleFunc("POST /tickets/{id}/{action}", a.ticketAction)
 	a.View("tickets", a.ticketView)
 	a.View("content", a.contentView)
-	a.Events(a.event)
 	return a
 }
 func (a *app) tickets(w http.ResponseWriter, r *http.Request) {
 	if !c.Member(w, r) {
 		return
 	}
-	rows, e := a.Filter("tickets", func(row p.Record) bool { return c.OwnList(r, row) })
+	result, e := a.ReadRecords("tickets", r, c.OwnerFilters(r), "subject", "email", "status")
 	if !c.Err(w, e) {
-		p.JSON(w, rows)
+		c.ListResponse(w, r, result)
 	}
 }
 func (a *app) ticket(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +66,8 @@ func (a *app) ticketAction(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 403, "无权操作此工单")
 		return
 	}
+	var events []p.Emission
+	operation := p.ID()
 	switch r.PathValue("action") {
 	case "reply":
 		var b p.Record
@@ -85,8 +85,7 @@ func (a *app) ticketAction(w http.ResponseWriter, r *http.Request) {
 		row["messages"] = append(messages, message(r, p.Text(b, "message"), ids))
 		if p.Admin(r) {
 			row["status"] = "answered"
-			pending, _ := row["pendingNotifications"].([]any)
-			row["pendingNotifications"] = append(pending, map[string]any{"userId": row["userId"], "subject": row["subject"], "ticketId": row["id"], "messageId": p.ID()})
+			events = append(events, p.Emission{Type: "ticket.replied", Data: p.Record{"userId": row["userId"], "subject": row["subject"], "ticketId": row["id"], "messageId": operation}})
 		} else {
 			row["status"] = "open"
 		}
@@ -97,14 +96,8 @@ func (a *app) ticketAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row["updatedAt"] = c.Now()
-	if c.Err(w, a.C.Put("tickets", row)) {
+	if c.Err(w, a.C.Commit("ticket:"+operation, []p.Write{{Collection: "tickets", Record: row}}, events...)) {
 		return
 	}
-	if p.Admin(r) && r.PathValue("action") == "reply" {
-		if err := a.flushTicketNotifications(row); err != nil {
-			log.Printf("工单回复已保存，通知等待重试：%v", err)
-		}
-	}
-	delete(row, "pendingNotifications")
 	p.JSON(w, row)
 }

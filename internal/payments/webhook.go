@@ -137,11 +137,8 @@ func (a *app) recordPayment(data p.Record) error {
 		data["status"], data["message"] = "needs_review", reason
 		return a.C.Put("transactions", data)
 	}
-	if e = a.C.Emit("payment.succeeded", data); e != nil {
-		return e
-	}
 	data["status"] = "queued"
-	return a.C.Put("transactions", data)
+	return a.C.Commit("payment-queued:"+p.Text(data, "id"), []p.Write{{Collection: "transactions", Record: data}}, p.Emission{Type: "payment.succeeded", Data: data})
 }
 
 func (a *app) event(e p.Event) error {
