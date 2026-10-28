@@ -25,6 +25,8 @@ type templateData struct {
 	Subject, Message, Content            string
 	ActionURL, ActionLabel               string
 	ExpiryMinutes                        int
+	ExpiresAt                            string
+	QuotaGiB, UsedGiB                    float64
 }
 
 type renderedMail struct {
@@ -39,6 +41,8 @@ var templateDefaults = []mailTemplate{
 	{ID: "password-reset", Name: "找回密码", Subject: "{{.SiteName}} · 重置登录密码", Text: "{{.UserName}}，您好：\n\n请在 {{.ExpiryMinutes}} 分钟内打开以下链接重置密码：\n{{.ResetURL}}\n\n如果不是您本人操作，请忽略此邮件。", HTML: defaultHTML},
 	{ID: "order-fulfilled", Name: "订单开通", Subject: "{{.SiteName}} · 订单已开通", Text: "{{.UserName}}，您好：\n\n您的订单 {{.OrderNumber}} 已完成。\n商品：{{.PlanName}}\n\n登录查看：{{.ActionURL}}", HTML: defaultHTML},
 	{ID: "ticket-replied", Name: "工单回复", Subject: "{{.SiteName}} · 工单有新回复", Text: "{{.UserName}}，您好：\n\n您的工单「{{.TicketSubject}}」已收到回复。\n\n登录查看：{{.ActionURL}}", HTML: defaultHTML},
+	{ID: "access-expiry", Name: "套餐即将到期", Subject: "{{.SiteName}} · 套餐即将到期", Text: "{{.UserName}}，您好：\n\n您的套餐将于 {{.ExpiresAt}} 到期，请及时续费。\n\n查看套餐：{{.ActionURL}}", HTML: defaultHTML},
+	{ID: "access-traffic", Name: "流量耗尽", Subject: "{{.SiteName}} · 本周期流量已耗尽", Text: "{{.UserName}}，您好：\n\n本周期已用 {{printf \"%.2f\" .UsedGiB}} GB，额度为 {{printf \"%.2f\" .QuotaGiB}} GB。\n您可以等待流量重置或购买适用套餐。\n\n查看用量：{{.ActionURL}}", HTML: defaultHTML},
 	{ID: "general", Name: "通用通知", Subject: "{{.Subject}}", Text: "{{.Message}}", HTML: defaultHTML},
 }
 
@@ -52,7 +56,7 @@ func defaultTemplate(id string) (mailTemplate, bool) {
 }
 
 func sampleData() templateData {
-	return templateData{SiteName: "PxBoard", UserName: "示例用户", Email: "preview@example.invalid", PublicURL: "https://example.invalid", OrderID: "preview-order", OrderNumber: "PX202610280001", PlanName: "示例套餐 · 月付", TicketID: "preview-ticket", TicketSubject: "连接问题", ResetURL: "https://example.invalid/reset?token=preview-only", Subject: "示例通知", Message: "这是一条通知内容。", ActionURL: "https://example.invalid/user", ActionLabel: "查看详情", ExpiryMinutes: 30}
+	return templateData{SiteName: "PxBoard", UserName: "示例用户", Email: "preview@example.invalid", PublicURL: "https://example.invalid", OrderID: "preview-order", OrderNumber: "PX202610280001", PlanName: "示例套餐 · 月付", TicketID: "preview-ticket", TicketSubject: "连接问题", ResetURL: "https://example.invalid/reset?token=preview-only", Subject: "示例通知", Message: "这是一条通知内容。", ActionURL: "https://example.invalid/user", ActionLabel: "查看详情", ExpiryMinutes: 30, ExpiresAt: "2026-11-01 12:00 UTC", QuotaGiB: 100, UsedGiB: 100}
 }
 
 func renderMail(item mailTemplate, data templateData) (renderedMail, error) {
@@ -104,10 +108,14 @@ func templateVariables(id string) []map[string]string {
 		keys = append(keys, "OrderNumber", "OrderID", "PlanName")
 	case "ticket-replied":
 		keys = append(keys, "TicketSubject", "TicketID")
+	case "access-expiry":
+		keys = append(keys, "ExpiresAt")
+	case "access-traffic":
+		keys = append(keys, "UsedGiB", "QuotaGiB")
 	case "general":
 		keys = append(keys, "Message")
 	}
-	labels := map[string]string{"SiteName": "站点名称", "UserName": "用户名称", "Email": "用户邮箱", "PublicURL": "面板地址", "Subject": "邮件主题", "Content": "渲染后正文", "ActionURL": "操作链接", "ActionLabel": "操作名称", "ResetURL": "密码重置链接", "ExpiryMinutes": "链接有效分钟数", "OrderNumber": "订单号", "OrderID": "订单标识", "PlanName": "商品名称", "TicketSubject": "工单主题", "TicketID": "工单标识", "Message": "通知内容"}
+	labels := map[string]string{"SiteName": "站点名称", "UserName": "用户名称", "Email": "用户邮箱", "PublicURL": "面板地址", "Subject": "邮件主题", "Content": "渲染后正文", "ActionURL": "操作链接", "ActionLabel": "操作名称", "ResetURL": "密码重置链接", "ExpiryMinutes": "链接有效分钟数", "OrderNumber": "订单号", "OrderID": "订单标识", "PlanName": "商品名称", "TicketSubject": "工单主题", "TicketID": "工单标识", "Message": "通知内容", "ExpiresAt": "到期时间", "QuotaGiB": "周期流量额度", "UsedGiB": "当前已用流量"}
 	out := []map[string]string{}
 	for _, key := range keys {
 		item := map[string]string{"key": key, "label": labels[key], "token": "{{." + key + "}}"}

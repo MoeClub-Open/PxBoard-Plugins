@@ -10,7 +10,8 @@
   "name": "访问账户",
   "permissions": [
     "storage:own",
-    "users:read"
+    "users:read",
+    "emit:access.reminder"
   ],
   "author": "PxBoard",
   "category": "连接",
@@ -47,6 +48,13 @@
         "numericId"
       ],
       "userField": "userId"
+    },
+    {
+      "collection": "preferences",
+      "required": [
+        "expireReminder",
+        "trafficReminder"
+      ]
     }
   ]
 }

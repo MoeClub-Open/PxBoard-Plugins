@@ -3,6 +3,7 @@ package notifications
 import (
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+	"math"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -50,6 +51,14 @@ func (a *app) mailConfig(w http.ResponseWriter, r *http.Request) {
 	publicURL, e := url.Parse(p.Text(b, "publicUrl"))
 	if e != nil || publicURL.Host == "" || publicURL.User != nil || publicURL.RawQuery != "" || publicURL.Fragment != "" || !c.Allowed(publicURL.Scheme, "http", "https") {
 		p.Fail(w, 400, "请填写完整的面板 HTTP 或 HTTPS 地址")
+		return
+	}
+	if b["sendsPerMinute"] == nil {
+		b["sendsPerMinute"] = 60.0
+	}
+	rate := p.Number(b, "sendsPerMinute")
+	if rate < 1 || math.Trunc(rate) != rate {
+		p.Fail(w, 400, "每分钟发送上限须为正整数")
 		return
 	}
 	if !c.Err(w, a.C.Put("mail", b)) {

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var entitlementFields = []string{"expiresAt", "quotaGiB", "unlimited", "groups", "cycleStart", "cycleDays", "resetPolicy", "status", "accessLevel", "levelExpiresAt", "speedLimitMbps", "deviceLimit", "planFamilyId"}
+var entitlementFields = []string{"expiresAt", "quotaGiB", "unlimited", "groups", "cycleStart", "cycleDays", "resetPolicy", "status", "accessLevel", "levelExpiresAt", "speedLimitMbps", "deviceLimit", "planFamilyId", "lastGrantId", "planSourceId"}
 
 func addMonths(value time.Time, months int) time.Time {
 	start := time.Date(value.Year(), value.Month()+time.Month(months), 1, value.Hour(), value.Minute(), value.Second(), 0, value.Location())
@@ -37,6 +37,7 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 			row = v
 		}
 	}
+	existed := row != nil
 	if row == nil {
 		if c.Allowed(p.Text(b, "kind"), "traffic", "reset", "time") {
 			p.Fail(w, 400, "请先开通基础套餐")
@@ -50,6 +51,16 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := grants[p.Text(b, "grantId")]; ok {
 		p.JSON(w, row)
+		return
+	}
+	if expected, ok := b["expectedRevision"]; ok && (p.Service(r, "commerce") || p.Admin(r)) {
+		if p.Text(row, "entitlementRevision") != expected || p.Bool(b, "expectedAccountExists") != existed {
+			p.Fail(w, 409, "账户权益已变化，请重新下单")
+			return
+		}
+	}
+	if p.Bool(b, "replaceEntitlement") && !p.Service(r, "commerce") && !p.Admin(r) {
+		p.Fail(w, 403, "无权替换套餐权益")
 		return
 	}
 	sequence := 0.0
@@ -68,7 +79,7 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		row["cycleStart"] = cycleNow()
 	default:
 		base := time.Now()
-		if expires, e := time.Parse(time.RFC3339, p.Text(row, "expiresAt")); e == nil && expires.After(base) {
+		if expires, e := time.Parse(time.RFC3339, p.Text(row, "expiresAt")); !p.Bool(b, "replaceEntitlement") && e == nil && expires.After(base) {
 			base = expires
 		}
 		zoneName := p.Text(b, "timezone")
@@ -93,8 +104,11 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 			p.Fail(w, 400, "套餐缺少有效期限")
 			return
 		}
+		if p.Text(b, "kind") != "time" && p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") {
+			delete(row, "planSourceId")
+		}
 		if p.Text(b, "kind") != "time" {
-			if !p.Bool(b, "preserveUsage") && (p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") || p.Text(b, "planFamilyId") == "") {
+			if !p.Bool(b, "preserveUsage") && (p.Bool(b, "replaceEntitlement") || p.Text(row, "planFamilyId") != p.Text(b, "planFamilyId") || p.Text(b, "planFamilyId") == "") {
 				row["cycleStart"] = cycleNow()
 			}
 			for _, key := range []string{"quotaGiB", "unlimited", "groups", "accessLevel", "speedLimitMbps", "deviceLimit", "planFamilyId"} {
@@ -136,6 +150,8 @@ func (a *app) grant(w http.ResponseWriter, r *http.Request) {
 		}
 		row["status"] = "active"
 	}
+	previous["grantedExpiresAt"], previous["grantedQuotaGiB"] = row["expiresAt"], row["quotaGiB"]
+	row["lastGrantId"], row["entitlementRevision"] = b["grantId"], p.ID()
 	grants[p.Text(b, "grantId")] = previous
 	row["grants"] = grants
 	if !c.Err(w, a.C.Put("accounts", row)) {
@@ -181,6 +197,7 @@ func (a *app) revoke(w http.ResponseWriter, r *http.Request) {
 		if row["status"] == nil {
 			row["status"] = "suspended"
 		}
+		row["entitlementRevision"] = p.ID()
 		grant["revoked"] = true
 		grants[p.Text(b, "grantId")] = grant
 		row["grants"] = grants

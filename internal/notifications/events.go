@@ -8,7 +8,7 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-func (a *app) composeEvent(event p.Event, user p.Record) (p.Record, error) {
+func (a *app) composeEvent(event p.Event, user p.Record, override ...mailTemplate) (p.Record, error) {
 	configs, err := a.C.List("mail")
 	if err != nil {
 		return nil, err
@@ -52,6 +52,17 @@ func (a *app) composeEvent(event p.Event, user p.Record) (p.Record, error) {
 		id, expiresAt = "password-reset", created.Add(30*time.Minute).UTC().Format(time.RFC3339)
 		data.ResetURL = base + "/reset?token=" + p.Text(event.Data, "token")
 		data.ActionURL, data.ActionLabel, data.ExpiryMinutes = data.ResetURL, "重置密码", 30
+	case "access.reminder":
+		id = "access-expiry"
+		if p.Text(event.Data, "kind") == "traffic" {
+			id = "access-traffic"
+		}
+		data.ExpiresAt = p.Text(event.Data, "expiresAt")
+		if expiry, err := time.Parse(time.RFC3339, data.ExpiresAt); err == nil {
+			data.ExpiresAt = expiry.Format("2006-01-02 15:04 UTC")
+		}
+		data.UsedGiB, data.QuotaGiB = p.Number(event.Data, "usedGiB"), p.Number(event.Data, "quotaGiB")
+		expiresAt = time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
 	case "notification.requested":
 		id = "general"
 		data.Subject, data.Message = strings.TrimSpace(p.Text(event.Data, "subject")), p.Text(event.Data, "body")
@@ -61,7 +72,12 @@ func (a *app) composeEvent(event p.Event, user p.Record) (p.Record, error) {
 	default:
 		return nil, nil
 	}
-	item, err := a.loadTemplate(id)
+	var item mailTemplate
+	if len(override) > 0 {
+		item = override[0]
+	} else {
+		item, err = a.loadTemplate(id)
+	}
 	if err != nil {
 		return nil, err
 	}

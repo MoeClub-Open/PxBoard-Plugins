@@ -11,6 +11,11 @@ type app struct{ *c.App }
 
 func New() http.Handler {
 	a := &app{c.New()}
+	a.Mux.HandleFunc("GET /reminder-settings", a.reminderSettings)
+	a.Mux.HandleFunc("PATCH /reminder-settings", a.reminderSettings)
+	a.Mux.HandleFunc("GET /preferences", a.preferences)
+	a.Mux.HandleFunc("PATCH /preferences", a.preferences)
+	a.Mux.HandleFunc("POST /internal/reminder-valid", a.reminderValid)
 	a.Mux.HandleFunc("GET /accounts", a.accounts)
 	a.Mux.HandleFunc("POST /accounts", a.save)
 	a.Mux.HandleFunc("PATCH /accounts/{id}", a.save)
@@ -19,6 +24,7 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /internal/clients", a.clients)
 	a.Mux.HandleFunc("GET /internal/accounts", a.allAccounts)
 	a.Mux.HandleFunc("GET /internal/accounts/{user}", a.userAccount)
+	a.Mux.HandleFunc("GET /internal/billing/{user}", a.billingReceipts)
 	a.Mux.HandleFunc("POST /internal/grant", a.grant)
 	a.Mux.HandleFunc("POST /internal/revoke", a.revoke)
 	a.View("accounts", a.view)
@@ -119,6 +125,7 @@ func (a *app) save(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "状态无效")
 		return
 	}
+	b["entitlementRevision"] = p.ID()
 	if !c.Err(w, a.C.Put("accounts", b)) {
 		p.JSON(w, b)
 	}
@@ -136,6 +143,7 @@ func (a *app) reset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row["cycleStart"] = cycleNow()
+	row["entitlementRevision"] = p.ID()
 	if !c.Err(w, a.C.Put("accounts", row)) {
 		p.JSON(w, true)
 	}
@@ -153,6 +161,7 @@ func (a *app) suspend(w http.ResponseWriter, r *http.Request) {
 	} else {
 		row["status"] = "active"
 	}
+	row["entitlementRevision"] = p.ID()
 	if !c.Err(w, a.C.Put("accounts", row)) {
 		p.JSON(w, true)
 	}
@@ -190,6 +199,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	admin := p.Admin(r)
 	res := p.Resource{Key: "accounts", Title: "访问账户", Endpoint: "/accounts", Empty: "还没有访问账户", Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("status", "状态", "status", false), c.Field("usedGiB", "已用流量", "gib", false), c.Field("quotaGiB", "流量额度", "gib", false), c.Field("expiresAt", "到期时间", "datetime", false), c.GroupField("groups", "节点分组", false)}}
 	if admin {
+		res.Settings = &p.ResourceSettings{Title: "用量提醒", Endpoint: "/reminder-settings", Fields: []p.Field{c.Field("expireEnabled", "到期邮件提醒", "boolean", false), c.Field("expireDays", "提前提醒天数", "number", true), c.Field("trafficEnabled", "流量耗尽邮件提醒", "boolean", false)}}
 		res.CreateLabel = "添加访问账户"
 		res.Editable = true
 		res.Fields = []p.Field{c.UserField(), c.Field("quotaGiB", "每周期流量（GB）", "number", true), c.Field("cycleDays", "重置周期（天，0 为不重置）", "number", true), c.Field("expiresAt", "到期时间（留空为长期）", "datetime", false), c.GroupField("groups", "可用节点分组", true), c.Select("status", "状态", "active|正常", "suspended|暂停"), c.Field("unlimited", "不限流量", "boolean", false)}

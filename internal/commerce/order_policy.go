@@ -64,7 +64,10 @@ func (a *app) orderSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "PATCH" {
-		var body struct{ PaymentTimeoutMinutes int }
+		var body struct {
+			PaymentTimeoutMinutes             int
+			PlanChangeEnabled, SurplusEnabled *bool
+		}
 		if c.Err(w, p.Decode(r, &body)) {
 			return
 		}
@@ -73,9 +76,15 @@ func (a *app) orderSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		config["paymentTimeoutMinutes"] = body.PaymentTimeoutMinutes
+		if body.PlanChangeEnabled != nil {
+			config["planChangeEnabled"] = *body.PlanChangeEnabled
+		}
+		if body.SurplusEnabled != nil {
+			config["surplusEnabled"] = *body.SurplusEnabled
+		}
 		if c.Err(w, a.C.Put("settings", config)) {
 			return
 		}
 	}
-	p.JSON(w, p.Record{"paymentTimeoutMinutes": int(paymentTimeout(config) / time.Minute)})
+	p.JSON(w, p.Record{"paymentTimeoutMinutes": int(paymentTimeout(config) / time.Minute), "planChangeEnabled": config["planChangeEnabled"] != false, "surplusEnabled": config["surplusEnabled"] != false})
 }

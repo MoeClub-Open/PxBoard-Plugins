@@ -46,7 +46,18 @@ func (a *app) enrichedFor(user string) ([]p.Record, error) {
 	}
 	var usage []p.Record
 	if user == "" {
-		usage, e = a.C.List("usage")
+		ids := []string{}
+		for _, row := range rows {
+			ids = append(ids, p.Text(row, "userId")+"-"+p.Text(row, "cycleStart"))
+		}
+		for offset := 0; offset < len(ids); offset += 500 {
+			var current []p.Record
+			current, e = a.QueryAll("usage", p.Record{"field": "id", "op": "in", "value": ids[offset:min(offset+500, len(ids))]})
+			if e != nil {
+				return nil, e
+			}
+			usage = append(usage, current...)
+		}
 	} else if len(rows) > 0 {
 		usage, e = a.recordsFor("usage", "id", user+"-"+p.Text(rows[0], "cycleStart"))
 	}
@@ -89,7 +100,7 @@ func (a *app) enrichedFor(user string) ([]p.Record, error) {
 
 func clientAccount(row p.Record) p.Record {
 	out := p.Record{}
-	for _, key := range []string{"id", "userId", "numericId", "credential", "proxyPassword", "email", "effective", "status", "quotaGiB", "unlimited", "usedGiB", "expiresAt", "groups", "accessLevel", "levelExpiresAt", "allNodeGroups", "speedLimitMbps", "deviceLimit", "planFamilyId"} {
+	for _, key := range []string{"id", "userId", "numericId", "credential", "proxyPassword", "email", "effective", "status", "quotaGiB", "unlimited", "usedGiB", "expiresAt", "groups", "accessLevel", "levelExpiresAt", "allNodeGroups", "speedLimitMbps", "deviceLimit", "planFamilyId", "cycleStart", "entitlementRevision", "lastGrantId"} {
 		if value, ok := row[key]; ok {
 			out[key] = value
 		}
@@ -111,5 +122,9 @@ func (a *app) userAccount(w http.ResponseWriter, r *http.Request) {
 		p.JSON(w, nil)
 		return
 	}
-	p.JSON(w, clientAccount(rows[0]))
+	out := clientAccount(rows[0])
+	if p.Service(r, "commerce") || p.Admin(r) {
+		out["planSourceId"] = rows[0]["planSourceId"]
+	}
+	p.JSON(w, out)
 }

@@ -4,21 +4,23 @@
   "version": "0.0.1",
   "apiVersion": "1.0",
   "minCoreVersion": "1!0.0.1",
-  "description": "邮件模板、SMTP 投递、密码找回和业务通知",
+  "description": "批量邮件、邮件模板、SMTP 投递、密码找回和账户提醒",
   "category": "服务",
   "author": "PxBoard",
   "dependencies": {},
   "permissions": [
     "storage:own",
     "users:read",
-    "call:branding"
+    "call:branding",
+    "call:access"
   ],
   "events": [
     "order.fulfilled",
     "ticket.replied",
     "auth.reset-requested",
     "notification.requested",
-    "system.tick"
+    "system.tick",
+    "access.reminder"
   ],
   "capabilities": [
     "auth.password-reset"

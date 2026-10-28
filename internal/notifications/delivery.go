@@ -15,13 +15,22 @@ func (a *app) event(e p.Event) error {
 		if e.Source != "core" {
 			return fmt.Errorf("通知事件来源无效")
 		}
+		if err := a.queueCampaigns(); err != nil {
+			return err
+		}
 		a.startDelivery()
 		return nil
+	}
+	if e.Type == "access.reminder" && e.Source != "access" {
+		return fmt.Errorf("提醒事件来源无效")
 	}
 	if e.Type == "auth.reset-requested" && e.Source != "core" || e.Type == "order.fulfilled" && e.Source != "commerce" || e.Type == "ticket.replied" && e.Source != "support" {
 		return fmt.Errorf("通知事件来源无效")
 	}
 	id := e.ID
+	if e.Type == "access.reminder" {
+		id = "reminder:" + p.Text(e.Data, "reminderId")
+	}
 	if orderID := p.Text(e.Data, "orderId"); e.Type == "order.fulfilled" && orderID != "" {
 		id = "order-" + orderID
 	}
@@ -47,6 +56,10 @@ func (a *app) event(e p.Event) error {
 	if err != nil || row == nil {
 		return err
 	}
+	if e.Type == "access.reminder" {
+		row["reminder"] = e.Data
+	}
+	row["userId"] = p.Text(e.Data, "userId")
 	row["id"], row["status"], row["attempts"], row["createdAt"] = id, "pending", 0, e.CreatedAt
 	if err = a.C.Put("notifications", row); err != nil {
 		return err
@@ -77,16 +90,45 @@ func (a *app) deliver() error {
 	if err != nil {
 		return err
 	}
+	rate := p.Number(configs[0], "sendsPerMinute")
+	if rate <= 0 {
+		rate = 60
+	}
+	sent := 0
 	for _, row := range rows {
+		if sent >= 100 {
+			break
+		}
 		if p.Number(row, "attempts") >= 5 || p.Text(row, "nextAttemptAt") > c.Now() {
 			continue
 		}
+
 		if expiry := p.Text(row, "expiresAt"); expiry != "" && expiry <= c.Now() {
 			row["status"] = "expired"
 			delete(row, "body")
 			delete(row, "html")
 		} else {
+			if gap := time.Until(a.lastSent.Add(time.Minute / time.Duration(rate))); gap > 0 {
+				time.Sleep(gap)
+			}
+			allowed, err := a.notificationAllowed(row)
+			if err != nil {
+				log.Printf("通知 %s 暂无法核对：%v", p.Text(row, "id"), err)
+				continue
+			}
+			if !allowed {
+				continue
+			}
+			configs, err = a.C.List("mail")
+			if err != nil {
+				return err
+			}
+			if len(configs) == 0 || !p.Bool(configs[0], "enabled") {
+				return nil
+			}
 			err = send(configs[0], row)
+			sent++
+			a.lastSent = time.Now()
 			attempts := int(p.Number(row, "attempts")) + 1
 			row["attempts"] = attempts
 			if err != nil {

@@ -103,69 +103,15 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		row["kind"] = "recharge"
 		row["planName"] = "余额充值"
 	} else {
-		plan, period, e := a.selectPeriod(p.Text(b, "planId"), p.Text(b, "periodId"))
-		if c.Err(w, e) {
+		if c.Err(w, a.availableOrderSlot(user, config)) {
 			return
 		}
-		account, e := a.purchaseAccount(user)
-		if c.Err(w, e) {
+		quote, err := a.quotePlan(user, b, config, time.Now())
+		if c.Err(w, err) {
 			return
 		}
-		if !periodAvailable(plan, period, account) {
-			p.Fail(w, 400, "此套餐暂不可购买或续费")
-			return
-		}
-		plan = periodPlan(plan, period)
-		if account == nil && c.Allowed(p.Text(plan, "kind"), "traffic", "reset", "time") {
-			p.Fail(w, 400, "请先购买基础套餐，再使用补充套餐")
-			return
-		}
-		row["planId"] = plan["id"]
-		row["periodId"] = period["id"]
-		row["periodLabel"] = periodLabel(period)
-		row["planName"] = p.Text(plan, "name") + " · " + periodLabel(period)
-		row["amount"] = plan["price"]
-		row["plan"] = plan
-		row["kind"] = plan["kind"]
-		if code := strings.TrimSpace(p.Text(b, "coupon")); code != "" {
-			coupons, e := a.C.List("coupons")
-			if c.Err(w, e) {
-				return
-			}
-			var coupon p.Record
-			for _, v := range coupons {
-				if v["code"] == code {
-					coupon = v
-				}
-			}
-			if coupon == nil {
-				p.Fail(w, 400, "优惠码无效或已到期")
-				return
-			}
-			orders, e := a.C.List("orders")
-			if c.Err(w, e) {
-				return
-			}
-			if c.Err(w, checkCoupon(coupon, plan, period, user, c.Now(), orders)) {
-				return
-			}
-			discount := p.Number(coupon, "discount")
-			if p.Text(coupon, "type") == "percent" {
-				discount = math.Round(p.Number(row, "amount") * discount / 100)
-			}
-			row["discount"] = discount
-			row["amount"] = math.Max(0, p.Number(row, "amount")-discount)
-			row["couponId"] = coupon["id"]
-		}
-		customer, e := a.customer(user)
-		if c.Err(w, e) {
-			return
-		}
-		if percent := p.Number(customer, "discountPercent"); percent > 0 {
-			discount := math.Round(p.Number(plan, "price") * percent / 100)
-			row["vipDiscount"] = discount
-			row["discount"] = math.Min(p.Number(plan, "price"), p.Number(row, "discount")+discount)
-			row["amount"] = math.Max(0, p.Number(plan, "price")-p.Number(row, "discount"))
+		for key, value := range quote {
+			row[key] = value
 		}
 	}
 	if !c.Err(w, a.C.Put("orders", row)) {
@@ -229,6 +175,16 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if p.Text(row, "status") == "pending" {
+			valid, err := a.validOrderAccount(row)
+			if c.Err(w, err) {
+				return
+			}
+			if !valid {
+				p.Fail(w, 409, "账户权益已变化，请取消订单后重新购买")
+				return
+			}
+		}
+		if p.Text(row, "status") == "pending" {
 			already, e2 := a.walletDebited(row)
 			if c.Err(w, e2) {
 				return
@@ -287,6 +243,14 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 		}
 		if p.Text(row, "status") != "fulfilled" && p.Text(row, "status") != "refunding" {
 			p.Fail(w, 400, "只能退回已完成订单")
+			return
+		}
+		balance, err := a.balance(p.Text(row, "userId"))
+		if c.Err(w, err) {
+			return
+		}
+		if balance+p.Number(row, "amount")-p.Number(row, "surplusCredit") < 0 {
+			p.Fail(w, 400, "折抵余款已使用，余额不足以撤销该次换购")
 			return
 		}
 		row["status"] = "refunding"

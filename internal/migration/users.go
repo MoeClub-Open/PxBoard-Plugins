@@ -128,6 +128,7 @@ func (m *mapper) v2Users() {
 			account["expiresAt"] = time.Unix(0, 0).UTC().Format(time.RFC3339)
 		}
 		m.user(row, table, text(row, "password"), account, m.money(row, "balance", false))
+		m.doc("access", "preferences", m.id("user", text(row, "id")), p.Record{"expireReminder": row["remind_expire"] == nil || truth(row, "remind_expire"), "trafficReminder": row["remind_traffic"] == nil || truth(row, "remind_traffic")})
 		id := m.id("user", text(row, "id"))
 		if token := text(row, "token"); token != "" {
 			m.doc("subscriptions", "links", m.id("subscription", text(row, "id")), p.Record{"userId": id, "token": token, "createdAt": m.created(row, "created_at"), "source": m.ref(row, table)})

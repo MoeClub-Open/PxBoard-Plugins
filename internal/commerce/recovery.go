@@ -85,7 +85,7 @@ func (a *app) paymentSucceeded(data p.Record) error {
 		return e
 	}
 	samePayment := p.Text(row, "method") == "online" && p.Text(data, "id") != "" && p.Text(row, "paymentId") == p.Text(data, "id")
-	if samePayment && (p.Text(row, "status") == "fulfilled" || p.Text(row, "status") == "refunded") {
+	if samePayment && (p.Text(row, "status") == "fulfilled" || p.Text(row, "status") == "credited" || p.Text(row, "status") == "refunded") {
 		return nil
 	}
 	if p.Text(row, "status") != "pending" && !(p.Text(row, "status") == "paid" && samePayment) {

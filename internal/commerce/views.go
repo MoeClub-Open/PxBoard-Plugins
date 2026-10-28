@@ -69,10 +69,10 @@ func (a *app) orderView(r *http.Request) (p.View, error) {
 		return p.View{}, e
 	}
 
-	resource := p.Resource{Paginated: true, Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "实付金额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}
+	resource := p.Resource{Paginated: true, Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "应付金额", "money", false), c.Field("surplusAmount", "套餐折抵", "money", false), c.Field("surplusCredit", "折抵转入余额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}
 	if p.Admin(r) {
 		resource.Filters = orderFilterFields()
-		resource.Settings = &p.ResourceSettings{Title: "订单设置", Endpoint: "/order-settings", Fields: []p.Field{c.Field("paymentTimeoutMinutes", "待支付有效期（分钟）", "number", true)}}
+		resource.Settings = &p.ResourceSettings{Title: "订单设置", Endpoint: "/order-settings", Fields: []p.Field{c.Field("paymentTimeoutMinutes", "待支付有效期（分钟）", "number", true), c.Field("planChangeEnabled", "允许更换套餐", "boolean", false), c.Field("surplusEnabled", "更换套餐折抵剩余价值", "boolean", false)}}
 		resource.Columns = append(resource.Columns, c.Field("email", "用户", "text", false), c.Field("cancelReasonLabel", "取消原因", "text", false), c.Field("canceledAt", "取消时间", "datetime", false))
 	}
 	return p.View{Title: "订单", Metrics: []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}}, Resources: []p.Resource{resource}}, nil
@@ -112,7 +112,7 @@ func (a *app) orderTotals(r *http.Request) (float64, int, error) {
 	}
 	total, pending := 0.0, 0
 	for _, row := range rows {
-		if p.Text(row, "status") == "fulfilled" && p.Text(row, "kind") != "recharge" {
+		if c.Allowed(p.Text(row, "status"), "fulfilled", "credited") && p.Text(row, "kind") != "recharge" {
 			total += p.Number(row, "amount")
 		}
 		if p.Text(row, "status") == "pending" {

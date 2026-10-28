@@ -108,6 +108,7 @@ func New() http.Handler {
 			p.JSON(w, p.Record{"title": "套餐信息", "details": string(details)})
 		}
 	})
+	a.Mux.HandleFunc("POST /orders/quote", a.quote)
 	a.Mux.HandleFunc("POST /orders", a.order)
 	a.Mux.HandleFunc("POST /orders/{id}/{action}", a.orderAction)
 	a.Mux.HandleFunc("GET /ledger", a.ledger)

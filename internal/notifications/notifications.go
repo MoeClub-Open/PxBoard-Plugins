@@ -3,6 +3,7 @@ package notifications
 import (
 	"net/http"
 	"sync"
+	"time"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
@@ -10,11 +11,18 @@ import (
 
 type app struct {
 	*c.App
-	delivery sync.Mutex
+	delivery  sync.Mutex
+	lastSent  time.Time
+	campaigns sync.Mutex
 }
 
 func New() http.Handler {
 	a := &app{App: c.New()}
+	a.Mux.HandleFunc("GET /campaigns", a.campaignList)
+	a.Mux.HandleFunc("POST /campaigns", a.saveCampaign)
+	a.Mux.HandleFunc("GET /campaigns/{id}", a.getCampaign)
+	a.Mux.HandleFunc("PATCH /campaigns/{id}", a.saveCampaign)
+	a.Mux.HandleFunc("POST /campaigns/{id}/{action}", a.campaignAction)
 	a.Mux.HandleFunc("GET /mail", a.mailConfig)
 	a.Mux.HandleFunc("PATCH /mail", a.mailConfig)
 	a.Mux.HandleFunc("GET /templates", a.templates)

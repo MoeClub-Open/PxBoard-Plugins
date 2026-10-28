@@ -91,7 +91,7 @@ func (a *app) commission(data p.Record) error {
 	if p.Text(order, "status") == "refunded" || p.Text(order, "status") == "refunding" {
 		return a.reverse(data)
 	}
-	if p.Text(order, "status") != "fulfilled" || p.Text(order, "kind") == "recharge" || p.Number(order, "amount") <= 0 {
+	if !c.Allowed(p.Text(order, "status"), "fulfilled", "credited") || p.Text(order, "kind") == "recharge" || p.Number(order, "amount") <= 0 {
 		return nil
 	}
 	referral, e := a.record("referrals", p.Text(order, "userId"))

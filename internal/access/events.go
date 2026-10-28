@@ -73,7 +73,10 @@ func (a *app) event(e p.Event) error {
 			}
 		}
 	case "system.tick":
-		return a.resetCycles()
+		if err := a.resetCycles(); err != nil {
+			return err
+		}
+		return a.sendReminders()
 	}
 	return nil
 }
