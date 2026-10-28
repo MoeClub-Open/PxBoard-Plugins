@@ -14,14 +14,32 @@ func (a *app) orders(w http.ResponseWriter, r *http.Request) {
 	if !c.Member(w, r) {
 		return
 	}
-	filters := c.OwnerFilters(r)
-	if kind := r.URL.Query().Get("kind"); kind != "" {
-		filters = append(filters, p.Record{"field": "kind", "value": kind})
+	filters, e := orderFilters(r)
+	if c.Err(w, e) {
+		return
 	}
-	result, e := a.ReadRecords("orders", r, filters, "number", "planName", "status", "method")
+	config, e := a.config()
+	if c.Err(w, e) {
+		return
+	}
+	result, e := a.ReadRecords("orders", r, filters, "number", "planName", "userId", "status", "method")
 	if !c.Err(w, e) {
+		emails := map[string]string{}
+		if p.Admin(r) {
+			users, err := a.UsersFor(result.Items, "userId")
+			if c.Err(w, err) {
+				return
+			}
+			for _, user := range users {
+				emails[p.Text(user, "id")] = p.Text(user, "email")
+			}
+		}
 		for _, row := range result.Items {
+			if p.Admin(r) {
+				row["email"] = emails[p.Text(row, "userId")]
+			}
 			row["refundable"] = !p.Bool(row, "imported")
+			annotateOrder(row, paymentTimeout(config))
 		}
 		c.ListResponse(w, r, result)
 	}
@@ -34,6 +52,11 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, p.Decode(r, &b)) {
 		return
 	}
+	config, err := a.config()
+	if c.Err(w, err) {
+		return
+	}
+	timeout := paymentTimeout(config)
 	user := p.Subject(r).ID
 	if p.Admin(r) && p.Text(b, "userId") != "" {
 		user = p.Text(b, "userId")
@@ -55,6 +78,10 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 					p.Fail(w, 409, "购买内容已变化，请重新确认后下单")
 					return
 				}
+				if _, err := a.expirePending(order, timeout, time.Now()); c.Err(w, err) {
+					return
+				}
+				annotateOrder(order, timeout)
 				p.JSON(w, order)
 				return
 			}
@@ -142,6 +169,7 @@ func (a *app) order(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !c.Err(w, a.C.Put("orders", row)) {
+		annotateOrder(row, timeout)
 		p.JSON(w, row)
 	}
 }
@@ -161,6 +189,16 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "此订单已结算，不支持再次支付或自动撤销权益")
 		return
 	}
+	config, e := a.config()
+	if c.Err(w, e) {
+		return
+	}
+	if expired, err := a.expirePending(row, paymentTimeout(config), time.Now()); c.Err(w, err) {
+		return
+	} else if expired {
+		p.Fail(w, 400, "订单已超时取消，请重新下单")
+		return
+	}
 	action := r.PathValue("action")
 	switch action {
 	case "cancel":
@@ -176,8 +214,7 @@ func (a *app) orderAction(w http.ResponseWriter, r *http.Request) {
 			p.Fail(w, 409, "余额已扣款，订单正在开通，不能取消")
 			return
 		}
-		row["status"] = "canceled"
-		e = a.C.Put("orders", row)
+		e = a.cancelOrder(row, "manual", time.Now())
 	case "pay":
 		if p.Text(row, "status") == "fulfilled" {
 			p.JSON(w, true)

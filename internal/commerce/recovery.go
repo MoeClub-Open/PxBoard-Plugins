@@ -13,6 +13,11 @@ func (a *app) walletDebited(order p.Record) (bool, error) {
 }
 
 func (a *app) tick() error {
+	config, err := a.config()
+	if err != nil {
+		return err
+	}
+	timeout := paymentTimeout(config)
 	var failures []error
 	orders := map[string]p.Record{}
 	filters := []p.Record{{"field": "status", "value": "paid"}, {"field": "status", "value": "refunding"}, {"field": "status", "value": "pending"}}
@@ -42,9 +47,8 @@ func (a *app) tick() error {
 			} else if debited {
 				row["method"] = "wallet"
 				err = a.paid(row)
-			} else if created, parseErr := time.Parse(time.RFC3339, p.Text(row, "createdAt")); parseErr == nil && time.Since(created) > 24*time.Hour {
-				row["status"] = "canceled"
-				err = a.C.Put("orders", row)
+			} else if orderExpired(row, timeout, time.Now()) {
+				err = a.cancelOrder(row, "timeout", time.Now())
 			}
 		}
 		if err != nil {
@@ -72,6 +76,13 @@ func (a *app) paymentSucceeded(data p.Record) error {
 	}
 	if p.Number(row, "amount") != p.Number(data, "amount") || row["currency"] != data["currency"] {
 		return a.paymentReview(data, "支付金额或币种与订单不符")
+	}
+	config, e := a.config()
+	if e != nil {
+		return e
+	}
+	if _, e = a.expirePending(row, paymentTimeout(config), time.Now()); e != nil {
+		return e
 	}
 	samePayment := p.Text(row, "method") == "online" && p.Text(data, "id") != "" && p.Text(row, "paymentId") == p.Text(data, "id")
 	if samePayment && (p.Text(row, "status") == "fulfilled" || p.Text(row, "status") == "refunded") {

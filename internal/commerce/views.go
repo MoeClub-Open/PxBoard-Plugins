@@ -79,7 +79,13 @@ func (a *app) orderView(r *http.Request) (p.View, error) {
 			pending++
 		}
 	}
-	return p.View{Title: "订单", Metrics: []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}}, Resources: []p.Resource{{Paginated: true, Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "实付金额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}}}, nil
+	resource := p.Resource{Paginated: true, Key: "orders", Title: "订单记录", Endpoint: "/orders", CreateLabel: "创建订单", Fields: fields, Columns: []p.Field{c.Field("number", "订单号", "copy", false), c.Field("planName", "商品", "text", false), c.Field("amount", "实付金额", "money", false), c.Field("status", "状态", "status", false), c.Field("method", "支付方式", "tag", false), c.Field("createdAt", "创建时间", "datetime", false)}, Actions: actions}
+	if p.Admin(r) {
+		resource.Filters = orderFilterFields()
+		resource.Settings = &p.ResourceSettings{Title: "订单设置", Endpoint: "/order-settings", Fields: []p.Field{c.Field("paymentTimeoutMinutes", "待支付有效期（分钟）", "number", true)}}
+		resource.Columns = append(resource.Columns, c.Field("email", "用户", "text", false), c.Field("cancelReasonLabel", "取消原因", "text", false), c.Field("canceledAt", "取消时间", "datetime", false))
+	}
+	return p.View{Title: "订单", Metrics: []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}}, Resources: []p.Resource{resource}}, nil
 }
 func (a *app) walletView(r *http.Request) (p.View, error) {
 	balance, e := a.balance(p.Subject(r).ID)

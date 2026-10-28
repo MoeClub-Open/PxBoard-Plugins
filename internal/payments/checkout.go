@@ -33,6 +33,10 @@ func (a *app) checkout(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 400, "订单已支付或已关闭")
 		return
 	}
+	if deadline, err := time.Parse(time.RFC3339, p.Text(order, "expiresAt")); err == nil && !time.Now().Before(deadline) {
+		p.Fail(w, 400, "订单已超时，请重新下单")
+		return
+	}
 	channel, e := a.Find("channels", p.Text(b, "channelId"))
 	if c.Err(w, e) {
 		return

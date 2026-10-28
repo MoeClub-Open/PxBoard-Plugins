@@ -93,6 +93,8 @@ func New() http.Handler {
 	a.Mux.HandleFunc("GET /public/currency", a.publicCurrency)
 	a.Mux.HandleFunc("GET /currency", a.currencySettings)
 	a.Mux.HandleFunc("PATCH /currency", a.currencySettings)
+	a.Mux.HandleFunc("GET /order-settings", a.orderSettings)
+	a.Mux.HandleFunc("PATCH /order-settings", a.orderSettings)
 	a.Mux.HandleFunc("POST /plans/{id}/details", func(w http.ResponseWriter, r *http.Request) {
 		if !c.Require(w, r) {
 			return
@@ -168,6 +170,11 @@ func (a *app) internalOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	row, e := a.Find("orders", r.PathValue("id"))
 	if !c.Err(w, e) {
+		config, err := a.config()
+		if c.Err(w, err) {
+			return
+		}
+		annotateOrder(row, paymentTimeout(config))
 		p.JSON(w, row)
 	}
 }
