@@ -34,6 +34,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	fields = append(fields, p.Field{Key: "includeNodes", Label: "同时导入节点和机器", Type: "boolean", Default: false})
 	fields = append(fields, p.Field{Key: "includeAffiliate", Label: "同时导入推广关系与佣金（需启用推广插件）", Type: "boolean", Default: false})
 	if a.Source != "sspanel" {
+		fields = append(fields, p.Field{Key: "includeTemplates", Label: "导入订阅模板", Type: "boolean", Default: true})
 		fields = append(fields, p.Field{Key: "includeRoutes", Label: "导入后台入口和订阅地址", Type: "boolean", Default: true, Hint: "已有不同配置时会阻止导入；订阅域名需要指向新面板"})
 		fields = append(fields, p.Field{Key: "systemResetMethod", Label: "源面板系统流量重置方式", Type: "select", Default: "auto", Options: []p.Option{{Label: "套餐各自指定（不跟随系统）", Value: "auto"}, {Label: "每月 1 日", Value: "0"}, {Label: "到期日按月重置", Value: "1"}, {Label: "不重置", Value: "2"}, {Label: "每年 1 月 1 日", Value: "3"}, {Label: "到期日按年重置", Value: "4"}}})
 	}

@@ -19,6 +19,7 @@ type Options struct {
 	IncludeNodes      bool   `json:"includeNodes"`
 	IncludeAffiliate  bool   `json:"includeAffiliate"`
 	IncludeRoutes     bool   `json:"includeRoutes"`
+	IncludeTemplates  bool   `json:"includeTemplates"`
 	PasswordMethod    string `json:"passwordMethod"`
 	PasswordSalt      string `json:"passwordSalt"`
 	SystemResetMethod string `json:"systemResetMethod"`
@@ -75,6 +76,9 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 		m.v2Plans()
 		if options.IncludeRoutes {
 			m.v2Routes()
+		}
+		if options.IncludeTemplates {
+			m.v2Templates()
 		}
 		for _, row := range snapshot.Rows("v2_settings") {
 			if text(row, "name") == "currency" || text(row, "name") == "currency_symbol" {

@@ -8,7 +8,7 @@
 | registration | [账户注册与全局注册开关](docs/registration.md) |
 | access | [访问权益、配额、周期流量](docs/access-redeem.md) |
 | nodes | [节点、接入令牌、配置同步与状态监控](docs/noders-management.md) |
-| subscriptions | [通用订阅、多链接与客户端绑定](docs/subscriptions.md) |
+| subscriptions | [通用订阅、多链接与客户端绑定](docs/subscriptions.md)，[完整模板、分流和旧站模板转换](docs/subscription-templates.md) |
 | redeem | [访问权益与可选余额兑换码](docs/redeem.md) |
 | commerce | [套餐、订单、余额、价格优惠](docs/commerce.md) |
 | affiliate | [推广、佣金与提现](docs/affiliate.md) |

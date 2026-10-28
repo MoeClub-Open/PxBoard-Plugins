@@ -46,7 +46,8 @@
       "accounts"
     ],
     "subscriptions": [
-      "links"
+      "links",
+      "templates"
     ],
     "nodes": [
       "nodes",

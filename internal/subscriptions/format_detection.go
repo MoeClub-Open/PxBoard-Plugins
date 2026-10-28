@@ -8,7 +8,16 @@ import (
 // Explicit format wins; otherwise use the client's identity and default to Mihomo.
 func subscriptionFormat(r *http.Request) string {
 	if format := strings.ToLower(r.URL.Query().Get("format")); format != "" {
-		return format
+		switch format {
+		case "mihomo", "meta", "clashmeta", "clash-meta":
+			return "clash"
+		case "singbox":
+			return "sing-box"
+		case "raw", "base64":
+			return "uri"
+		default:
+			return format
+		}
 	}
 	client := strings.ToLower(r.URL.Query().Get("flag"))
 	if client == "uri" {
