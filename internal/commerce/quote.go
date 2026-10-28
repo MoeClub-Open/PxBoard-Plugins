@@ -92,7 +92,7 @@ func (a *app) quotePlan(user string, b, config p.Record, now time.Time) (p.Recor
 		expiry, err := time.Parse(time.RFC3339, p.Text(account, "expiresAt"))
 		active := account != nil && p.Text(account, "status") == "active" && (p.Text(account, "expiresAt") == "" || err == nil && expiry.After(now))
 		changing := family != "" && active && (family != p.Text(plan, "planFamilyId") || (p.Text(plan, "durationUnit") == "permanent") != (p.Text(account, "expiresAt") == ""))
-		row["replaceEntitlement"] = changing || family != p.Text(plan, "planFamilyId")
+		row["replaceEntitlement"] = changing || family != p.Text(plan, "planFamilyId") || p.Text(plan, "durationUnit") == "permanent"
 		if changing {
 			if config["planChangeEnabled"] == false {
 				return nil, fmt.Errorf("本站暂未开放更换套餐")

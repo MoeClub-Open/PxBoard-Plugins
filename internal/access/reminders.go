@@ -58,11 +58,16 @@ func (a *app) preferences(w http.ResponseWriter, r *http.Request) {
 		row = rows[0]
 	}
 	if r.Method == "PATCH" {
-		var b struct{ ExpireReminder, TrafficReminder bool }
+		var b struct{ ExpireReminder, TrafficReminder *bool }
 		if c.Err(w, p.Decode(r, &b)) {
 			return
 		}
-		row["expireReminder"], row["trafficReminder"] = b.ExpireReminder, b.TrafficReminder
+		if b.ExpireReminder != nil {
+			row["expireReminder"] = *b.ExpireReminder
+		}
+		if b.TrafficReminder != nil {
+			row["trafficReminder"] = *b.TrafficReminder
+		}
 		if c.Err(w, a.C.Put("preferences", row)) {
 			return
 		}

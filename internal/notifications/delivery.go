@@ -96,7 +96,7 @@ func (a *app) deliver() error {
 	}
 	sent := 0
 	for _, row := range rows {
-		if sent >= 100 {
+		if sent >= min(100, int(rate)) {
 			break
 		}
 		if p.Number(row, "attempts") >= 5 || p.Text(row, "nextAttemptAt") > c.Now() {
