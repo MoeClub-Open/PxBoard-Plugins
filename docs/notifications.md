@@ -8,9 +8,37 @@
 
 订单以订单编号、工单回复以回复编号去重，其他通知以事件编号去重；重复收到通知不会覆盖已有记录，也不会把已发送邮件重新放入队列。邮件在后台逐封发送，失败时按逐渐延长的间隔重试，最多自动尝试 5 次，也可在投递记录中手动重试。关闭邮件通知时保留队列，重新启用后继续处理。
 
-投递记录不向界面返回邮件正文，成功或过期后也会移除保存的正文。SMTP 接收时连接中断可能使发送端无法确认是否已送达；重试仍可能产生重复邮件。每条通知使用固定的 Message-ID，便于邮件服务识别。
+投递记录分页显示并可按状态筛选，不向界面返回纯文本或 HTML 正文；成功或过期后会同时移除两种正文。SMTP 接收时连接中断可能使发送端无法确认是否已送达；重试仍可能产生重复邮件。每条通知使用固定的 Message-ID，便于邮件服务识别。
 
 其他可信插件可声明 `emit:notification.requested` 权限并发送同名事件，数据包含 `userId`、`subject` 和纯文本 `body`。邮件插件根据用户 ID 查找收件地址；重复事件以事件 ID 去重。插件启用时才接收新事件；停用期间不会补收以前未分配的事件。
+
+## 邮件模板
+
+在“邮件通知 → 邮件模板”编辑找回密码、订单开通、工单回复和通用通知四种模板。主题和纯文本正文分别保存；HTML 外观可编辑或留空，留空时发送纯文本。默认 HTML 使用 `{{.Content}}` 展示已渲染正文，通常只修改“正文”即可同时更新两种格式。列表提供恢复默认，不删除已生成的邮件记录。
+
+编辑器支持按光标位置插入变量，并使用示例用户预览纯文本和 HTML。预览不读取实际用户或重置令牌，不入队、不发送邮件；HTML 预览在禁用脚本的独立框架中显示。模板语法遵循 Go `text/template` / `html/template`，例如 `{{.SiteName}}`、`{{.UserName}}`；HTML 自动转义变量内容。未知变量、空主题和正文、主题换行会阻止保存。找回密码的纯文本正文必须保留 `{{.ResetURL}}`。
+
+| 用途 | 专用变量 |
+| --- | --- |
+| 找回密码 | `ResetURL`、`ExpiryMinutes` |
+| 订单开通 | `OrderNumber`、`OrderID`、`PlanName` |
+| 工单回复 | `TicketSubject`、`TicketID` |
+| 通用通知 | `Subject`、`Message` |
+
+共有变量包括 `SiteName`、`UserName`、`Email`、`PublicURL`、`ActionURL`、`ActionLabel`。HTML 另可使用渲染后的 `Subject` 和 `Content`。站点名称读取可选品牌插件，未安装时使用 PxBoard；通知插件不要求安装商业或用户服务插件。
+
+邮件进入队列时确定模板和内容，修改模板只影响此后生成的邮件。重试继续使用原有内容和 Message-ID，避免同一通知因模板修改而改变。HTML 邮件使用标准 `multipart/alternative`，保留纯文本版本；UTF-8 内容使用 quoted-printable 编码。
+
+管理员接口均相对 `/api/v1/extensions/notifications`：
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET/PATCH /mail` | SMTP 单例配置；GET 返回隐藏密码的单条记录数组 |
+| `GET /templates` | 模板元信息列表 |
+| `GET/PATCH /templates/{id}` | 读取或保存 `subject/text/html`，读取附带变量定义 |
+| `POST /templates/{id}/preview` | 预览提交的内容，返回 `subject/text/html` |
+| `POST /templates/{id}/reset` | 删除覆盖配置并恢复内置内容 |
+| `GET /notifications?limit=12&offset=0&status=failed&q=...` | 按页读取投递记录和总数 |
 
 ## 从旧用户服务升级
 

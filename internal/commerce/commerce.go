@@ -123,19 +123,11 @@ func New() http.Handler {
 	a.View("coupons", a.couponView)
 	a.View("currency", a.currencyView)
 	a.Summary(func(r *http.Request) ([]p.Metric, error) {
-		rows, e := a.Filter("orders", func(row p.Record) bool { return c.Own(r, row) })
+		total, pending, e := a.orderTotals(r)
 		if e != nil {
 			return nil, e
 		}
-		total, pending := 0.0, 0
-		for _, row := range rows {
-			if p.Text(row, "status") == "fulfilled" && p.Text(row, "kind") != "recharge" {
-				total += p.Number(row, "amount")
-			}
-			if p.Text(row, "status") == "pending" {
-				pending++
-			}
-		}
+
 		balance, e := a.balance(p.Subject(r).ID)
 		return []p.Metric{{Label: "累计成交", Value: total / 100, Unit: "元"}, {Label: "待支付订单", Value: pending}, {Label: "我的余额", Value: balance / 100, Unit: "元"}}, e
 	})

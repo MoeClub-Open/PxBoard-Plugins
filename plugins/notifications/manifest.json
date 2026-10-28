@@ -4,13 +4,14 @@
   "version": "0.0.1",
   "apiVersion": "1.0",
   "minCoreVersion": "1!0.0.1",
-  "description": "邮件投递、密码找回和业务通知",
+  "description": "邮件模板、SMTP 投递、密码找回和业务通知",
   "category": "服务",
   "author": "PxBoard",
   "dependencies": {},
   "permissions": [
     "storage:own",
-    "users:read"
+    "users:read",
+    "call:branding"
   ],
   "events": [
     "order.fulfilled",

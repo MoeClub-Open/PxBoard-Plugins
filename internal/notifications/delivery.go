@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
@@ -29,63 +28,30 @@ func (a *app) event(e p.Event) error {
 	if messageID := p.Text(e.Data, "messageId"); e.Type == "ticket.replied" && messageID != "" {
 		id = "reply-" + messageID
 	}
-	rows, err := a.C.List("notifications")
+	known, err := a.C.Query(p.Query{Collection: "notifications", Limit: 1, Filters: []p.Filter{{Field: "id", Value: id}}})
 	if err != nil {
 		return err
 	}
-	for _, row := range rows {
-		if p.Text(row, "id") == id {
-			return nil
-		}
+	if len(known.Items) > 0 {
+		return nil
 	}
+
 	users, err := a.C.UsersByID(p.Text(e.Data, "userId"))
 	if err != nil {
 		return err
 	}
-	email := ""
-	for _, u := range users {
-		if u["id"] == e.Data["userId"] {
-			email = p.Text(u, "email")
-			break
-		}
-	}
-	if email == "" {
+	if len(users) == 0 || p.Text(users[0], "email") == "" {
 		return nil
 	}
-	subject, body, expiresAt := "", "", ""
-	switch e.Type {
-	case "order.fulfilled":
-		subject = "订单已开通"
-		body = "您的订单已完成：" + p.Text(e.Data, "planName")
-	case "ticket.replied":
-		subject = "工单有新回复"
-		body = "您的工单「" + p.Text(e.Data, "subject") + "」已收到回复，请登录查看。"
-	case "auth.reset-requested":
-		configs, err := a.C.List("mail")
-		if err != nil {
-			return err
-		}
-		if len(configs) == 0 || !p.Bool(configs[0], "enabled") {
-			return nil
-		}
-		createdAt, err := time.Parse(time.RFC3339, e.CreatedAt)
-		if err != nil {
-			return err
-		}
-		expiresAt = createdAt.Add(30 * time.Minute).UTC().Format(time.RFC3339)
-		subject = "重置登录密码"
-		body = "请在 30 分钟内打开此链接重置密码：\n" + strings.TrimSuffix(p.Text(configs[0], "publicUrl"), "/") + "/reset?token=" + p.Text(e.Data, "token")
-	case "notification.requested":
-		subject, body = strings.TrimSpace(p.Text(e.Data, "subject")), p.Text(e.Data, "body")
-		if subject == "" || body == "" {
-			return fmt.Errorf("通知缺少主题或内容")
-		}
-	default:
-		return nil
-	}
-	if err = a.C.Put("notifications", p.Record{"id": id, "to": email, "subject": subject, "body": body, "status": "pending", "attempts": 0.0, "createdAt": e.CreatedAt, "expiresAt": expiresAt}); err != nil {
+	row, err := a.composeEvent(e, users[0])
+	if err != nil || row == nil {
 		return err
 	}
+	row["id"], row["status"], row["attempts"], row["createdAt"] = id, "pending", 0, e.CreatedAt
+	if err = a.C.Put("notifications", row); err != nil {
+		return err
+	}
+
 	a.startDelivery()
 	return nil
 }
@@ -107,18 +73,18 @@ func (a *app) deliver() error {
 	if err != nil || len(configs) == 0 || !p.Bool(configs[0], "enabled") {
 		return err
 	}
-	rows, err := a.C.List("notifications")
+	rows, err := a.QueryAll("notifications", p.Record{"field": "status", "op": "in", "value": []string{"pending", "failed"}})
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		status := p.Text(row, "status")
-		if status == "sent" || status == "expired" || p.Number(row, "attempts") >= 5 || p.Text(row, "nextAttemptAt") > c.Now() {
+		if p.Number(row, "attempts") >= 5 || p.Text(row, "nextAttemptAt") > c.Now() {
 			continue
 		}
 		if expiry := p.Text(row, "expiresAt"); expiry != "" && expiry <= c.Now() {
 			row["status"] = "expired"
 			delete(row, "body")
+			delete(row, "html")
 		} else {
 			err = send(configs[0], row)
 			attempts := int(p.Number(row, "attempts")) + 1
@@ -129,6 +95,7 @@ func (a *app) deliver() error {
 			} else {
 				row["status"], row["sentAt"] = "sent", c.Now()
 				delete(row, "body")
+				delete(row, "html")
 				delete(row, "error")
 				delete(row, "nextAttemptAt")
 			}

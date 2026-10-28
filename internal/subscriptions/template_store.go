@@ -62,11 +62,7 @@ func (a *app) profileTitle(settings p.Record) string {
 	if title := strings.TrimSpace(p.Text(settings, "profileTitle")); title != "" {
 		return title
 	}
-	var branding p.Record
-	if a.C.Call("branding", "GET", "/public", nil, &branding) == nil && strings.TrimSpace(p.Text(branding, "name")) != "" {
-		return p.Text(branding, "name")
-	}
-	return "PxBoard"
+	return a.SiteName()
 }
 
 func (a *app) directHosts(host, homepage string) ([]string, error) {

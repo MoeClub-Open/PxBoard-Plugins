@@ -264,6 +264,8 @@ node tools/migrate-node-groups.ts --database /绝对路径/pxboard.db --apply
 
 ## 快照与归档格式
 
+完整兑换模板保存在原始归档中，单码只需保留模板编号与转换后的可执行规则。已有构建重复保存的 `sourceTemplate` 可使用 `node tools/compact-migration-provenance.ts --database /数据目录/pxboard.db` 检查，确认数量后加 `--apply` 清理。工具只有在对应来源归档中的完整模板与副本完全一致时才移除副本；没有归档或内容不同的记录保留。写入使用一个事务，直接通过 SQLite 移除该字段，不重新序列化金额、码值、奖励或其他业务字段，也不修改兑换记录。
+
 快照包含来源、导出时间、时区及各表的列描述和原始记录：
 
 ```json

@@ -38,7 +38,7 @@ func (a *app) fulfill(row p.Record) error {
 	}
 	row["status"] = "fulfilled"
 	row["fulfilledAt"] = c.Now()
-	return a.C.Commit("order-fulfilled:"+p.Text(row, "id"), []p.Write{{Collection: "orders", Record: row}}, p.Emission{Type: "order.fulfilled", Data: p.Record{"orderId": row["id"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"], "kind": row["kind"], "paidAt": row["paidAt"], "fulfilledAt": row["fulfilledAt"]}})
+	return a.C.Commit("order-fulfilled:"+p.Text(row, "id"), []p.Write{{Collection: "orders", Record: row}}, p.Emission{Type: "order.fulfilled", Data: p.Record{"orderId": row["id"], "orderNumber": row["number"], "userId": row["userId"], "amount": row["amount"], "planName": row["planName"], "kind": row["kind"], "paidAt": row["paidAt"], "fulfilledAt": row["fulfilledAt"]}})
 }
 func (a *app) refund(row p.Record) error {
 	if p.Text(row, "kind") == "recharge" {

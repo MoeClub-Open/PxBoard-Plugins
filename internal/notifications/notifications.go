@@ -16,8 +16,11 @@ type app struct {
 func New() http.Handler {
 	a := &app{App: c.New()}
 	a.Mux.HandleFunc("GET /mail", a.mailConfig)
-	a.Mux.HandleFunc("POST /mail", a.mailConfig)
-	a.Mux.HandleFunc("PATCH /mail/{id}", a.mailConfig)
+	a.Mux.HandleFunc("PATCH /mail", a.mailConfig)
+	a.Mux.HandleFunc("GET /templates", a.templates)
+	a.Mux.HandleFunc("GET /templates/{id}", a.templateAction)
+	a.Mux.HandleFunc("PATCH /templates/{id}", a.templateAction)
+	a.Mux.HandleFunc("POST /templates/{id}/{action}", a.templateAction)
 	a.Mux.HandleFunc("GET /notifications", a.notifications)
 	a.Mux.HandleFunc("POST /notifications/{id}/retry", a.retryNotification)
 	a.Mux.HandleFunc("GET /_capabilities", func(w http.ResponseWriter, r *http.Request) {

@@ -25,7 +25,7 @@ func (m *mapper) v2Redeem() {
 	for _, row := range rows {
 		template := templates[text(row, "template_id")]
 		rewards, limits, conditions := object(template, "rewards"), object(template, "limits"), object(template, "conditions")
-		code := p.Record{"code": text(row, "code"), "name": text(template, "name"), "kind": "balance", "amount": 0, "limit": integer(row, "max_usage"), "perUserLimit": 0, "historicalUses": 0, "enabled": truth(template, "status") && integer(row, "status") <= 1, "expiresAt": m.timeValue(row, "expires_at"), "createdAt": m.created(row, "created_at"), "redemptionGroup": m.id("gift-template", text(row, "template_id")), "groupPerUserLimit": integer(limits, "max_use_per_user"), "cooldownHours": number(limits, "cooldown_hours"), "source": m.ref(row, table), "sourceContent": row, "sourceTemplate": template}
+		code := p.Record{"code": text(row, "code"), "name": text(template, "name"), "kind": "balance", "amount": 0, "limit": integer(row, "max_usage"), "perUserLimit": 0, "historicalUses": 0, "enabled": truth(template, "status") && integer(row, "status") <= 1, "expiresAt": m.timeValue(row, "expires_at"), "createdAt": m.created(row, "created_at"), "redemptionGroup": m.id("gift-template", text(row, "template_id")), "groupPerUserLimit": integer(limits, "max_use_per_user"), "cooldownHours": number(limits, "cooldown_hours"), "source": m.ref(row, table), "sourceContent": row}
 		if code["name"] == "" {
 			code["name"] = "兑换码"
 		}

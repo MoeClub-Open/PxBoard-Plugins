@@ -60,11 +60,16 @@ func (a *app) notifications(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {
 		return
 	}
-	rows, e := a.C.List("notifications")
-	for _, row := range rows {
+	filters := []p.Record{}
+	if status := r.URL.Query().Get("status"); status != "" {
+		filters = append(filters, p.Record{"field": "status", "value": status})
+	}
+	result, e := a.ReadRecords("notifications", r, filters, "to", "subject", "status")
+	for _, row := range result.Items {
 		delete(row, "body")
+		delete(row, "html")
 	}
 	if !c.Err(w, e) {
-		p.JSON(w, rows)
+		c.ListResponse(w, r, result)
 	}
 }
