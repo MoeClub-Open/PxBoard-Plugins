@@ -15,6 +15,7 @@
   "permissions": [
     "storage:own",
     "import:users",
+    "import:settings",
     "import:access",
     "import:nodes",
     "import:commerce",

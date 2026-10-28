@@ -18,6 +18,7 @@ var sourcePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 type Options struct {
 	IncludeNodes      bool   `json:"includeNodes"`
 	IncludeAffiliate  bool   `json:"includeAffiliate"`
+	IncludeRoutes     bool   `json:"includeRoutes"`
 	PasswordMethod    string `json:"passwordMethod"`
 	PasswordSalt      string `json:"passwordSalt"`
 	SystemResetMethod string `json:"systemResetMethod"`
@@ -72,6 +73,9 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	} else if snapshot.Source == "v2board" || snapshot.Source == "xboard" {
 		m.v2Users()
 		m.v2Plans()
+		if options.IncludeRoutes {
+			m.v2Routes()
+		}
 		for _, row := range snapshot.Rows("v2_settings") {
 			if text(row, "name") == "currency" || text(row, "name") == "currency_symbol" {
 				m.warning("原站设置包含金额单位；请在商业插件的金额设置中核对原单位和符号，迁移不会覆盖目标设置。")
@@ -88,7 +92,7 @@ func Build(snapshot *Snapshot, pluginID string, options Options) (*Plan, error) 
 	if !options.IncludeAffiliate {
 		m.warning("未选择推广插件：原推广关系、个人返佣规则和购买历史仅归档，不在目标启用；非零可用佣金会阻断导入。")
 	}
-	m.warning("历史订单、支付、优惠、审计和旧系统设置仅保存原始记录，不自动启用；原兑换码与邀请码仅归档，不能在 PxBoard 直接兑换或使用。用户余额和套餐权益单独转换。订阅令牌保持不变，订阅地址需使用 PxBoard 新接口。")
+	m.warning("历史订单、支付、优惠、审计和未选择的旧系统设置仅保存原始记录，不自动启用；原兑换码与邀请码仅归档，不能在 PxBoard 直接兑换或使用。用户余额和套餐权益单独转换，订阅令牌保持不变。")
 	for _, name := range snapshot.Names() {
 		table := snapshot.Tables[name]
 		plan.SourceRows += len(table.Rows)

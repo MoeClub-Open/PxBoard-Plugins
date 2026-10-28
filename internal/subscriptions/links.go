@@ -76,6 +76,27 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, e) {
 		return
 	}
+	routes, e := a.C.List("public_routes")
+	if c.Err(w, e) {
+		return
+	}
+	customBase := ""
+	for _, route := range routes {
+		if p.Text(route, "id") != "primary" || !p.Bool(route, "enabled") {
+			continue
+		}
+		paths, err := p.PublicRoutePaths(route)
+		if err != nil {
+			continue
+		}
+		values := strings.FieldsFunc(p.Text(route, "baseUrls"), func(r rune) bool { return r == ',' || r == '\n' || r == '\r' })
+		if len(values) == 0 {
+			customBase = paths[0]
+		} else {
+			customBase = strings.TrimRight(strings.TrimSpace(values[0]), "/") + "/" + strings.TrimPrefix(p.Text(route, "path"), "/")
+		}
+		break
+	}
 	emails := map[string]any{}
 	for _, u := range users {
 		emails[p.Text(u, "id")] = u["email"]
@@ -90,6 +111,9 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		base := "/api/v1/extensions/subscriptions/s/" + url.PathEscape(p.Text(row, "token"))
+		if customBase != "" {
+			base = customBase + "/" + url.PathEscape(p.Text(row, "token"))
+		}
 		row["clashUrl"] = base + "?format=clash"
 		row["singboxUrl"] = base + "?format=sing-box"
 		row["shareUrl"] = base

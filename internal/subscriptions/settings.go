@@ -69,3 +69,41 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 		p.JSON(w, config)
 	}
 }
+
+func (a *app) routing(w http.ResponseWriter, r *http.Request) {
+	if !c.Require(w, r) {
+		return
+	}
+	rows, err := a.C.List("public_routes")
+	if c.Err(w, err) {
+		return
+	}
+	route := p.Record{"id": "primary", "enabled": false, "path": "/s", "baseUrls": ""}
+	for _, row := range rows {
+		if p.Text(row, "id") == "primary" {
+			route = row
+			break
+		}
+	}
+	if r.Method == http.MethodGet {
+		p.JSON(w, []p.Record{route})
+		return
+	}
+	var body struct {
+		Enabled  bool   `json:"enabled"`
+		Path     string `json:"path"`
+		BaseURLs string `json:"baseUrls"`
+	}
+	if c.Err(w, p.Decode(r, &body)) {
+		return
+	}
+	route = p.Record{"id": "primary", "enabled": body.Enabled, "path": body.Path, "baseUrls": body.BaseURLs}
+	if body.Enabled {
+		if _, err := p.PublicRoutePaths(route); c.Err(w, err) {
+			return
+		}
+	}
+	if !c.Err(w, a.C.Put("public_routes", route)) {
+		p.JSON(w, route)
+	}
+}

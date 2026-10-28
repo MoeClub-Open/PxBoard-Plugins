@@ -183,7 +183,7 @@ func (a *app) prepare(job p.Record) error {
 	job["sourceId"] = snapshot.SourceID
 	job["snapshotPath"] = path
 	delete(job, "dsn")
-	plan, e := Build(snapshot, a.ID, Options{IncludeNodes: p.Bool(job, "includeNodes"), IncludeAffiliate: p.Bool(job, "includeAffiliate"), PasswordMethod: p.Text(job, "passwordMethod"), PasswordSalt: p.Text(job, "passwordSalt"), SystemResetMethod: p.Text(job, "systemResetMethod"), Seed: p.Text(job, "seed")})
+	plan, e := Build(snapshot, a.ID, Options{IncludeNodes: p.Bool(job, "includeNodes"), IncludeAffiliate: p.Bool(job, "includeAffiliate"), IncludeRoutes: p.Bool(job, "includeRoutes"), PasswordMethod: p.Text(job, "passwordMethod"), PasswordSalt: p.Text(job, "passwordSalt"), SystemResetMethod: p.Text(job, "systemResetMethod"), Seed: p.Text(job, "seed")})
 	if e != nil {
 		return e
 	}
