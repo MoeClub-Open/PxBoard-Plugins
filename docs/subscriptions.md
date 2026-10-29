@@ -13,3 +13,9 @@
 订阅验证默认关闭，可复用独立人机验证插件；启用后需要为每条链接单独验证，详情见[人机验证](captcha.md)。未验证的链接不显示地址，服务端也拒绝拉取；验证通过后客户端不需要每次更新都验证。
 
 接口：`GET /api/v1/extensions/subscriptions/links?mine=1` 列出自己的链接；`POST /links` 可提交 `name` 和 `bindUserAgent`，只返回记录 ID；`POST /links/{id}/rotate` 重置，`DELETE /links/{id}` 删除。访问其他用户的链接需要管理员权限。
+
+## 已登录客户端
+
+原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=clash`、`sing-box`、`uri`，以及仅用于此认证接口的 `aerion` JSON 节点格式。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
+
+它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录及一次性打开用户前台的协议见主项目 `docs/native-clients.md`。Mihomo 配置保留当前生效模板与分流，Aerion 节点列表复用同一协议转换，避免 Mieru 经过 sing-box 时被省略。

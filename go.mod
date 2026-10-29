@@ -3,7 +3,7 @@ module github.com/MoeClub-Open/PxBoard-Plugins
 go 1.26.0
 
 require (
-	github.com/MoeClub-Open/PxBoard v0.4.0
+	github.com/MoeClub-Open/PxBoard v0.0.1
 	github.com/go-sql-driver/mysql v1.9.3
 	golang.org/x/oauth2 v0.37.0
 )
