@@ -4,8 +4,7 @@
   "homepage": "",
   "events": [
     "payment.succeeded",
-    "system.tick",
-    "workspace.configured"
+    "system.tick"
   ],
   "dependencies": {
     "access": ">=1!0.0.1"

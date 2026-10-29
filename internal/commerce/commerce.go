@@ -87,7 +87,6 @@ func New() http.Handler {
 			p.JSON(w, families)
 		}
 	})
-	a.Mux.HandleFunc("GET /public/plans", a.publicPlans)
 	a.Mux.HandleFunc("GET /period-options", a.periodOptions)
 	a.Mux.HandleFunc("GET /plans/{id}/period-options", a.periodOptions)
 	a.Mux.HandleFunc("GET /public/currency", a.publicCurrency)
@@ -137,16 +136,6 @@ func New() http.Handler {
 }
 func (a *app) event(e p.Event) error {
 	switch e.Type {
-	case "workspace.configured":
-		if e.Source != "core" {
-			return fmt.Errorf("工作空间事件来源无效")
-		}
-		config, err := a.config()
-		if err != nil {
-			return err
-		}
-		config["workspaceMode"] = p.Text(e.Data, "mode")
-		return a.C.Put("settings", config)
 	case "payment.succeeded":
 		if e.Source != "payments" {
 			return fmt.Errorf("支付事件来源无效")

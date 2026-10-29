@@ -9,8 +9,7 @@
   "author": "PxBoard",
   "dependencies": {},
   "permissions": [
-    "storage:own",
-    "call:commerce"
+    "storage:own"
   ],
   "publicPaths": [
     "/public"

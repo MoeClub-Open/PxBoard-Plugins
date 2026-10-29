@@ -3,6 +3,7 @@ package commerce
 import (
 	"math"
 	"net/http"
+	"net/url"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
@@ -112,4 +113,10 @@ func (a *app) internalCredit(w http.ResponseWriter, r *http.Request) {
 	if !c.Err(w, a.C.Put("ledger", row)) {
 		p.JSON(w, p.Record{"credited": true, "duplicate": false})
 	}
+}
+
+func (a *app) purchaseAccount(user string) (p.Record, error) {
+	var account p.Record
+	err := a.C.Call("access", "GET", "/internal/accounts/"+url.PathEscape(user), nil, &account)
+	return account, err
 }
