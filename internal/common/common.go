@@ -235,9 +235,6 @@ func (a *App) UsersFor(rows []p.Record, field string) ([]p.Record, error) {
 func Own(r *http.Request, row p.Record) bool {
 	return p.Admin(r) || p.Text(row, "userId") == p.Subject(r).ID
 }
-func OwnList(r *http.Request, row p.Record) bool {
-	return (p.Admin(r) && r.URL.Query().Get("mine") != "1") || p.Text(row, "userId") == p.Subject(r).ID
-}
 func Now() string { return time.Now().UTC().Format(time.RFC3339) }
 func Defaults(b, old p.Record, values p.Record) {
 	for k, v := range values {
