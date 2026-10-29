@@ -86,10 +86,6 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 	}
 	w.Header().Set("Subscription-Userinfo", info)
 	format := subscriptionFormat(r)
-	native := r.URL.Query().Get("format") == "aerion" && r.URL.Path == "/configuration"
-	if native {
-		format = "clash"
-	}
 	if !c.Allowed(format, "clash", "sing-box", "uri") {
 		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
 		return
@@ -123,17 +119,6 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 	allowed = sortedNodes(compatible)
 	if len(allowed) == 0 {
 		p.Fail(w, 403, "当前账户没有可用节点，请联系管理员")
-		return
-	}
-	if native {
-		rows := []p.Record{}
-		for _, node := range allowed {
-			proxy := clash(node, subscriptionPassword(account, node), p.Text(account, "credential"))
-			proxy["id"], proxy["host"] = node["id"], proxy["server"]
-			proxy["insecure"] = p.Bool(proxy, "skip-cert-verify")
-			rows = append(rows, proxy)
-		}
-		p.JSON(w, p.Record{"nodes": rows})
 		return
 	}
 	policySettings, err := a.templateSettings()

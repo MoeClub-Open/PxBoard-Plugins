@@ -16,6 +16,6 @@
 
 ## 已登录客户端
 
-原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=clash`、`sing-box`、`uri`，以及仅用于此认证接口的 `aerion` JSON 节点格式。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
+原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=clash`、`sing-box`、`uri`。节点与分流规则统一从所选配置格式读取。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
 
 它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录及一次性打开用户前台的协议见主项目 `docs/native-clients.md`。Mihomo 配置保留当前生效模板与分流，Aerion 节点列表复用同一协议转换，避免 Mieru 经过 sing-box 时被省略。

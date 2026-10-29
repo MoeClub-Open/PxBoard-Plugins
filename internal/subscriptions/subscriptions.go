@@ -18,7 +18,6 @@ func New() http.Handler {
 	a.Mux.HandleFunc("DELETE /links/{id}", a.deleteLink)
 	a.Mux.HandleFunc("POST /links/{id}/verify", a.verifyLink)
 	a.Mux.HandleFunc("GET /verification", a.verificationSettings)
-	a.Mux.HandleFunc("PATCH /verification", a.verificationSettings)
 	a.Mux.HandleFunc("GET /verification/settings", a.verificationSettings)
 	a.Mux.HandleFunc("PATCH /verification/settings", a.verificationSettings)
 	a.Mux.HandleFunc("GET /settings", a.settings)
