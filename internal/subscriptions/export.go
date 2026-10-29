@@ -44,6 +44,17 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 403, "请先登录面板并完成订阅验证")
 		return
 	}
+	a.exportAccount(w, r, link, client, major)
+}
+
+func (a *app) configuration(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if c.Member(w, r) {
+		a.exportAccount(w, r, p.Record{"userId": p.Subject(r).ID}, "", "")
+	}
+}
+
+func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Record, client, major string) {
 	var clients, nodes []p.Record
 	if c.Err(w, a.C.Call("access", "GET", "/internal/clients?userId="+url.QueryEscape(p.Text(link, "userId")), nil, &clients)) {
 		return
@@ -75,6 +86,10 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Subscription-Userinfo", info)
 	format := subscriptionFormat(r)
+	native := r.URL.Query().Get("format") == "aerion" && r.URL.Path == "/configuration"
+	if native {
+		format = "clash"
+	}
 	if !c.Allowed(format, "clash", "sing-box", "uri") {
 		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
 		return
@@ -108,6 +123,17 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	allowed = sortedNodes(compatible)
 	if len(allowed) == 0 {
 		p.Fail(w, 403, "当前账户没有可用节点，请联系管理员")
+		return
+	}
+	if native {
+		rows := []p.Record{}
+		for _, node := range allowed {
+			proxy := clash(node, subscriptionPassword(account, node), p.Text(account, "credential"))
+			proxy["id"], proxy["host"] = node["id"], proxy["server"]
+			proxy["insecure"] = p.Bool(proxy, "skip-cert-verify")
+			rows = append(rows, proxy)
+		}
+		p.JSON(w, p.Record{"nodes": rows})
 		return
 	}
 	policySettings, err := a.templateSettings()
