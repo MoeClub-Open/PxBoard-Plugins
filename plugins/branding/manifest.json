@@ -4,12 +4,13 @@
   "minCoreVersion": "1!0.0.1",
   "name": "站点品牌",
   "version": "0.0.1",
-  "description": "统一站点名称、Logo 和网站图标",
+  "description": "站点品牌、商业首页与搜索分享设置",
   "category": "界面",
   "author": "PxBoard",
   "dependencies": {},
   "permissions": [
-    "storage:own"
+    "storage:own",
+    "call:commerce"
   ],
   "publicPaths": [
     "/public"
@@ -17,7 +18,7 @@
   "pages": [
     {
       "id": "settings",
-      "title": "品牌设置",
+      "title": "站点设置",
       "icon": "settings",
       "group": "系统",
       "roles": [
@@ -25,5 +26,11 @@
       ]
     }
   ],
-  "versionEpoch": 1
+  "versionEpoch": 1,
+  "site": {
+    "path": "/_site",
+    "modes": [
+      "business"
+    ]
+  }
 }
