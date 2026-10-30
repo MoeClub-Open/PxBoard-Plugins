@@ -1,6 +1,6 @@
 # NodeRS 配置管理与面板迁移
 
-节点插件支持 NodeRS 本地面板配置的下发与结果记录。需要使用实现 `managedConfiguration` 的 NodeRS；旧版 NodeRS 不会读取配置任务，任务会保持等待状态。节点的协议、监听、证书和用户配置仍通过原有节点接口更新。
+节点插件支持 NodeRS 本地面板配置的下发与结果记录。使用原仓库的 [NodeRS v0.1.49 或更新版本](https://github.com/MoeclubM/NodeRS/releases)，同一安装包包含 Xboard、PxBoard 与 `managedConfiguration` 支持；此前安装组织适配版的节点，按 [发布源切换说明](https://github.com/MoeclubM/NodeRS/blob/main/docs/zh/install.md#从组织适配版升级) 完成一次升级。旧版 NodeRS 不会读取配置任务，任务会保持等待状态。节点的协议、监听、证书和用户配置仍通过原有节点接口更新。
 
 ## 创建 NodeRS 节点
 
