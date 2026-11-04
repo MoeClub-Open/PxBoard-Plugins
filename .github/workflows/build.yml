@@ -29,3 +29,6 @@ jobs:
       - name: Build official plugins
         working-directory: PxBoard-Plugins
         run: go build ./...
+      - name: Verify Flux nodes and subscription capability
+        working-directory: PxBoard-Plugins
+        run: go test ./internal/nodes ./internal/subscriptions

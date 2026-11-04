@@ -22,8 +22,11 @@ func supportsFlux(r *http.Request) bool {
 			if t == "" {
 				continue
 			}
+			if t == "all" {
+				continue
+			}
 			hasExplicitTypes = true
-			if t == "flux" || t == "all" {
+			if t == "flux" {
 				return true
 			}
 		}
@@ -39,7 +42,7 @@ func supportsFlux(r *http.Request) bool {
 				continue
 			}
 			hasExplicitHeader = true
-			if t == "flux" || t == "all" {
+			if t == "flux" {
 				return true
 			}
 		}
@@ -450,7 +453,7 @@ func clashFluxProtocolOptions(n, options, out p.Record) {
 					effPub = nodePub
 				}
 				effSID := chSID
-				if chPub == "" && effSID == "" {
+				if effSID == "" {
 					effSID = nodeSID
 				}
 				if effPub != "" {

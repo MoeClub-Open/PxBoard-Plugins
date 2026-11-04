@@ -119,3 +119,23 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 		}
 	}
 }
+
+func TestFluxAllTypesDoesNotClaimMihomoSupport(t *testing.T) {
+	req := httptest.NewRequest("GET", "/s/token?format=clash&types=all", nil)
+	req.Header.Set("User-Agent", "Mihomo/1.19.0")
+	if supportsFlux(req) {
+		t.Fatal("types=all does not make Mihomo support Flux")
+	}
+}
+
+func TestFluxIndependentKeyInheritsNodeShortID(t *testing.T) {
+	node := p.Record{"name": "Flux", "protocol": "flux", "host": "edge.example.com", "port": 443.0,
+		"protocolOptions": map[string]any{"security": "reality", "reality": map[string]any{"publicKey": "node-public", "shortId": "01234567"},
+			"channels": []any{map[string]any{"id": "independent", "transport": "tcp", "publicKey": "channel-public"}}}}
+	result := clash(node, "password", "user-id")
+	channels := result["channels"].([]p.Record)
+	reality := channels[0]["reality-opts"].(p.Record)
+	if reality["short-id"] != "01234567" {
+		t.Fatalf("missing inherited short ID: %v", reality)
+	}
+}
