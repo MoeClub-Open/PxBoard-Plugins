@@ -9,6 +9,8 @@ import (
 func subscriptionFormat(r *http.Request) string {
 	if format := strings.ToLower(r.URL.Query().Get("format")); format != "" {
 		switch format {
+		case "xbclient":
+			return "aerion"
 		case "mihomo", "meta", "clashmeta", "clash-meta":
 			return "clash"
 		case "singbox":
@@ -25,6 +27,11 @@ func subscriptionFormat(r *http.Request) string {
 	}
 	if client == "" {
 		client = strings.ToLower(r.UserAgent())
+	}
+	for _, name := range []string{"aerion", "xbclient"} {
+		if strings.Contains(client, name) {
+			return "aerion"
+		}
 	}
 	for _, name := range []string{"sing-box", "singbox", "hiddify", "sfm"} {
 		if strings.Contains(client, name) {

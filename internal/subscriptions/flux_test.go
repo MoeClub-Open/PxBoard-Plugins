@@ -71,23 +71,23 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 		t.Fatal("ordinary third-party Clash client should skip flux nodes")
 	}
 
-	typesReq := httptest.NewRequest("GET", "/s/token?format=clash&types=vless,vmess,flux", nil)
-	if !supportedFormat(node, "clash", typesReq) {
-		t.Fatal("client declaring types=...,flux should receive flux in clash format")
+	typesReq := httptest.NewRequest("GET", "/s/token?format=aerion&types=vless,vmess,flux", nil)
+	if !supportedFormat(node, "aerion", typesReq) {
+		t.Fatal("Aerion adapter should export declared Flux nodes")
 	}
-	if supportedFormat(node, "sing-box", typesReq) || supportedFormat(node, "uri", typesReq) {
-		t.Fatal("flux should only be emitted for clash format")
+	if supportedFormat(node, "clash", typesReq) || supportedFormat(node, "sing-box", typesReq) || supportedFormat(node, "uri", typesReq) {
+		t.Fatal("Flux must only be emitted by the Aerion adapter")
 	}
 
 	headerReq := httptest.NewRequest("GET", "/s/token", nil)
 	headerReq.Header.Set("X-XBClient-Protocols", "sudoku,flux")
-	if !supportedFormat(node, "clash", headerReq) {
+	if !supportedFormat(node, "aerion", headerReq) {
 		t.Fatal("client with X-XBClient-Protocols: sudoku,flux should receive flux")
 	}
 
 	uaReq := httptest.NewRequest("GET", "/s/token", nil)
 	uaReq.Header.Set("User-Agent", "Aerion/0.3.0")
-	if !supportedFormat(node, "clash", uaReq) {
+	if !supportedFormat(node, subscriptionFormat(uaReq), uaReq) {
 		t.Fatal("Aerion User-Agent should receive flux")
 	}
 
@@ -97,7 +97,7 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 		t.Fatal("legacy XBClient with explicit types omitting flux must not receive flux")
 	}
 
-	proxy := clash(node, "separate-proxy-password", "11111111-2222-3333-4444-555555555555")
+	proxy := aerion(node, "separate-proxy-password", "11111111-2222-3333-4444-555555555555")
 	if proxy["type"] != "flux" || proxy["key"] != "11111111-2222-3333-4444-555555555555" {
 		t.Fatalf("unexpected flux clash proxy identity: %#v", proxy)
 	}
@@ -132,7 +132,7 @@ func TestFluxIndependentKeyInheritsNodeShortID(t *testing.T) {
 	node := p.Record{"name": "Flux", "protocol": "flux", "host": "edge.example.com", "port": 443.0,
 		"protocolOptions": map[string]any{"security": "reality", "reality": map[string]any{"publicKey": "node-public", "shortId": "01234567"},
 			"channels": []any{map[string]any{"id": "independent", "transport": "tcp", "publicKey": "channel-public"}}}}
-	result := clash(node, "password", "user-id")
+	result := aerion(node, "password", "user-id")
 	channels := result["channels"].([]p.Record)
 	reality := channels[0]["reality-opts"].(p.Record)
 	if reality["short-id"] != "01234567" {
@@ -150,7 +150,7 @@ func TestFluxChannelCanEnableCertificateVerification(t *testing.T) {
 					map[string]any{"id": "verified", "transport": "tcp", key: false},
 					map[string]any{"id": "insecure", "transport": "tcp", key: true},
 				}}}
-			result := clash(node, "password", "user-id")
+			result := aerion(node, "password", "user-id")
 			channels := result["channels"].([]p.Record)
 			if result["skip-cert-verify"] != true {
 				t.Fatal("missing node default")

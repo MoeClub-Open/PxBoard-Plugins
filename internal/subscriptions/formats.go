@@ -40,9 +40,6 @@ func clash(n p.Record, cred, uuid string) p.Record {
 	if proto == "mieru" {
 		return mieruClash(n, uuid)
 	}
-	if proto == "flux" {
-		return fluxClash(n, cred, uuid)
-	}
 	typ := proto
 	if proto == "shadowsocks" {
 		typ = "ss"

@@ -86,8 +86,8 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 	}
 	w.Header().Set("Subscription-Userinfo", info)
 	format := subscriptionFormat(r)
-	if !c.Allowed(format, "clash", "sing-box", "uri") {
-		p.Fail(w, 400, "支持 clash、sing-box、uri 格式")
+	if !c.Allowed(format, "aerion", "clash", "sing-box", "uri") {
+		p.Fail(w, 400, "支持 aerion、clash、sing-box、uri 格式")
 		return
 	}
 	compatible := []p.Record{}
@@ -138,14 +138,20 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 		}
 		data = []byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n"))))
 	} else {
-		template, _, loadErr := a.selectedTemplate(format)
+		templateFormat := format
+		if format == "aerion" {
+			templateFormat = "clash"
+		}
+		template, _, loadErr := a.selectedTemplate(templateFormat)
 		if c.Err(w, loadErr) {
 			return
 		}
 		generated := []map[string]any{}
 		for _, node := range allowed {
 			var proxy p.Record
-			if format == "clash" {
+			if format == "aerion" {
+				proxy = aerion(node, subscriptionPassword(account, node), p.Text(account, "credential"))
+			} else if format == "clash" {
 				proxy = clash(node, subscriptionPassword(account, node), p.Text(account, "credential"))
 			} else {
 				proxy = singbox(node, subscriptionPassword(account, node), p.Text(account, "credential"))
@@ -156,8 +162,8 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 		if c.Err(w, hostErr) {
 			return
 		}
-		data, err = sc.Render(format, p.Text(template, "content"), generated, title, hosts)
-		if format == "clash" {
+		data, err = sc.Render(templateFormat, p.Text(template, "content"), generated, title, hosts)
+		if templateFormat == "clash" {
 			contentType = "text/yaml; charset=utf-8"
 		} else {
 			contentType = "application/json; charset=utf-8"
@@ -176,7 +182,7 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 	if homepage := p.Text(policySettings, "homepage"); homepage != "" && validHomepage(homepage) {
 		w.Header().Set("profile-web-page-url", homepage)
 	}
-	extension := map[string]string{"clash": "yaml", "sing-box": "json", "uri": "txt"}[format]
+	extension := map[string]string{"aerion": "yaml", "clash": "yaml", "sing-box": "json", "uri": "txt"}[format]
 	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(title+"."+extension))
 	w.Header().Set("Content-Type", contentType)
 	_, _ = w.Write(data)

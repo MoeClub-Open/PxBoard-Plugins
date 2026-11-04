@@ -50,6 +50,9 @@ func supportsFlux(r *http.Request) bool {
 	if hasExplicitHeader {
 		return false
 	}
+	if format := strings.ToLower(r.URL.Query().Get("format")); format == "aerion" || format == "xbclient" {
+		return true
+	}
 	flag := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("flag")))
 	if strings.Contains(flag, "aerion") || strings.Contains(flag, "xbclient") {
 		return true

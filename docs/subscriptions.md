@@ -1,6 +1,6 @@
 # 订阅链接
 
-完整客户端配置、默认分流、模板编辑、预览和旧站转换见[订阅模板](subscription-templates.md)。格式支持 `clash`（也接受 `mihomo`、`clashmeta`、`meta`）、`sing-box`（也接受 `singbox`）和 `uri`。
+完整客户端配置、默认分流、模板编辑、预览和旧站转换见[订阅模板](subscription-templates.md)。格式支持 `aerion`（也接受 `xbclient`）、`clash`（也接受 `mihomo`、`clashmeta`、`meta`）、`sing-box`（也接受 `singbox`）和 `uri`。
 
 用户可在“我的订阅”创建多条独立链接，分别命名、复制、重置或删除。重置后旧地址立即失效，同时解除该链接的客户端绑定；删除只影响这一条链接。原有订阅链接保持有效。通用地址根据客户端选择格式，普通浏览器默认得到 Mihomo 配置；也可使用 `format=clash`、`format=sing-box` 或 `format=uri` 指定格式。
 
@@ -16,6 +16,12 @@
 
 ## 已登录客户端
 
-原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=clash`、`sing-box`、`uri`。节点与分流规则统一从所选配置格式读取。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
+原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=aerion`、`clash`、`sing-box`、`uri`。节点与分流规则统一从所选配置格式读取。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
 
 它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录及一次性打开用户前台的协议见主项目 `docs/native-clients.md`。Mihomo 配置保留当前生效模板与分流，Aerion 节点列表复用同一协议转换，避免 Mieru 经过 sing-box 时被省略。
+
+## Aerion 与 Mihomo 分离
+
+XBClient 使用 `format=aerion`，公开链接也接受 `flag=aerion`，未指定格式时可由 Aerion/XBClient 的 User-Agent 自动选择。Aerion 独立控制协议支持，复用现有 YAML 模板和标准协议字段构造；Flux 仅通过这个适配器输出。显式 `format=clash` 或 `flag=meta` 始终选择普通 Mihomo，声明 `types=flux` 或 Flux 能力头也不会将自定义协议混入其中。
+
+`types` 中明确列出的协议优先于能力头，排除 Flux 时仍会过滤；`types=all` 使用所选适配器的协议范围。被过滤的协议通过 `X-PxBoard-Skipped-Protocols` 返回。模板仍在现有 Mihomo YAML 模板编辑器中统一维护，无需复制规则、代理组或模板记录。

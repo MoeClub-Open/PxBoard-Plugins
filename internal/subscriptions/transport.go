@@ -136,7 +136,7 @@ func uriTransport(n p.Record, q url.Values) {
 func supportedFormat(n p.Record, format string, r *http.Request) bool {
 	protocol := p.Text(n, "protocol")
 	if protocol == "flux" {
-		return format == "clash" && supportsFlux(r)
+		return format == "aerion" && supportsFlux(r)
 	}
 	if protocol == "mieru" {
 		return format != "sing-box"
