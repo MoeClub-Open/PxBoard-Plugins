@@ -9,13 +9,19 @@ import (
 )
 
 func mergeNodeSettings(b, old p.Record) {
-	for _, key := range []string{"certConfig", "protocolOptions"} {
+	for _, key := range []string{"certConfig", "protocolOptions", "tlsSettings"} {
 		patch, ok := b[key].(map[string]any)
 		if !ok {
 			continue
 		}
 		previous, _ := old[key].(map[string]any)
 		b[key] = mergeObject(previous, patch)
+		if key == "protocolOptions" {
+			if rawChannels, hasChannels := patch["channels"]; hasChannels {
+				merged := b[key].(map[string]any)
+				merged["channels"] = normalizeChannelSlice(rawChannels)
+			}
+		}
 		if key == "certConfig" {
 			merged := b[key].(map[string]any)
 			for canonical, aliases := range map[string][]string{
@@ -89,10 +95,16 @@ func normalizeNodeConnection(b p.Record, creating, transportChanged, certificate
 		if !p.Bool(b, "tls") {
 			b["tlsMode"] = "none"
 		}
+	case "flux":
+		return normalizeFluxNode(b, creating, certificateChanged)
 	}
 	if !p.Bool(b, "tls") || p.Text(b, "tlsMode") == "reality" {
 		return nil
 	}
+	return validateNodeCertificate(b, creating, certificateChanged)
+}
+
+func validateNodeCertificate(b p.Record, creating, certificateChanged bool) error {
 	cert, _ := b["certConfig"].(map[string]any)
 	mode := firstText(cert, "mode", "cert_mode", "certMode")
 	if mode == "" {

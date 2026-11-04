@@ -94,7 +94,7 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 	skipped := map[string]bool{}
 	for _, n := range allowed {
 		protocol := p.Text(n, "protocol")
-		if supportedFormat(n, format) {
+		if supportedFormat(n, format, r) {
 			compatible = append(compatible, n)
 		} else {
 			skipped[protocol] = true
@@ -111,6 +111,9 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 			message := "当前格式没有可用节点（协议或传输不支持：" + strings.Join(protocols, "、") + "）"
 			if skipped["mieru"] {
 				message += "；Mieru 请使用 Mihomo 订阅或支持 mierus 链接的客户端"
+			}
+			if skipped["flux"] {
+				message += "；Flux 请使用 XBClient 或支持 Flux 协议的客户端"
 			}
 			p.Fail(w, 400, message)
 			return

@@ -52,6 +52,15 @@ func (a *app) machineConfig(w http.ResponseWriter, r *http.Request) {
 	if p.Text(n, "tlsMode") == "reality" {
 		mode = "reality"
 	}
+	if p.Text(n, "protocol") == "flux" {
+		sec, fluxOptions := fluxMachineSecurityAndOptions(n)
+		transport := p.Text(n, "transport")
+		if transport == "" {
+			transport = "tcp"
+		}
+		p.JSON(w, p.Record{"id": n["wireId"], "protocol": n["protocol"], "host": n["host"], "listen": p.Record{"host": "0.0.0.0", "port": port}, "transport": p.Record{"type": transport, "settings": n["transportSettings"]}, "security": sec, "protocolOptions": fluxOptions})
+		return
+	}
 	security := p.Record{"mode": mode, "serverName": n["serverName"], "tlsSettings": n["tlsSettings"], "reality": n["realitySettings"], "certificate": n["certConfig"]}
 	if security["certificate"] == nil && mode == "tls" {
 		security["certificate"] = p.Record{"mode": "file", "cert_path": n["certPath"], "key_path": n["keyPath"]}

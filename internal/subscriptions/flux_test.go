@@ -1,0 +1,115 @@
+package subscriptions
+
+import (
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	sc "github.com/MoeClub-Open/PxBoard-Plugins/internal/subscriptionconfig"
+	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+)
+
+func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
+	node := p.Record{
+		"name":     "JP-Flux",
+		"protocol": "flux",
+		"host":     "jp.example.com",
+		"port":     443.0,
+		"protocolOptions": map[string]any{
+			"security":            "reality",
+			"ipStrategy":          "dual",
+			"standbyChannels":     2,
+			"rotationIntervalSec": 180,
+			"rotationBytesMb":     96,
+			"clientFingerprint":   "chrome",
+			"reality": map[string]any{
+				"serverName": "www.microsoft.com",
+				"publicKey":  "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo",
+				"shortId":    "01234567",
+			},
+			"channels": []any{
+				map[string]any{
+					"id":           "direct-udp",
+					"enabled":      true,
+					"connectPorts": "443",
+					"ipVersion":    "auto",
+					"transport":    "udp",
+					"role":         "primary",
+					"weight":       100,
+				},
+				map[string]any{
+					"id":           "cdn-ws",
+					"enabled":      true,
+					"connectHost":  "cdn.example.com",
+					"connectPorts": "443",
+					"ipVersion":    "ipv6",
+					"transport":    "http",
+					"httpMode":     "ws",
+					"httpHost":     "cdn.example.com",
+					"httpPath":     "/ws",
+					"httpHeaders":  map[string]string{"X-Route": "edge"},
+					"security":     "tls",
+					"sni":          "cdn.example.com",
+					"role":         "backup",
+					"weight":       60,
+				},
+				map[string]any{
+					"id":           "port-hop",
+					"enabled":      true,
+					"connectPorts": "20000-20010",
+					"transport":    "udp",
+					"security":     "obfs",
+					"obfsKey":      "0123456789abcdef0123456789abcdef",
+				},
+			},
+		},
+	}
+
+	ordinaryReq := httptest.NewRequest("GET", "/s/token?format=clash", nil)
+	ordinaryReq.Header.Set("User-Agent", "Clash.Meta/v1.18.0")
+	if supportedFormat(node, "clash", ordinaryReq) {
+		t.Fatal("ordinary third-party Clash client should skip flux nodes")
+	}
+
+	typesReq := httptest.NewRequest("GET", "/s/token?format=clash&types=vless,vmess,flux", nil)
+	if !supportedFormat(node, "clash", typesReq) {
+		t.Fatal("client declaring types=...,flux should receive flux in clash format")
+	}
+	if supportedFormat(node, "sing-box", typesReq) || supportedFormat(node, "uri", typesReq) {
+		t.Fatal("flux should only be emitted for clash format")
+	}
+
+	headerReq := httptest.NewRequest("GET", "/s/token", nil)
+	headerReq.Header.Set("X-XBClient-Protocols", "sudoku,flux")
+	if !supportedFormat(node, "clash", headerReq) {
+		t.Fatal("client with X-XBClient-Protocols: sudoku,flux should receive flux")
+	}
+
+	uaReq := httptest.NewRequest("GET", "/s/token", nil)
+	uaReq.Header.Set("User-Agent", "Aerion/0.3.0")
+	if !supportedFormat(node, "clash", uaReq) {
+		t.Fatal("Aerion User-Agent should receive flux")
+	}
+
+	proxy := clash(node, "separate-proxy-password", "11111111-2222-3333-4444-555555555555")
+	if proxy["type"] != "flux" || proxy["key"] != "11111111-2222-3333-4444-555555555555" {
+		t.Fatalf("unexpected flux clash proxy identity: %#v", proxy)
+	}
+	for _, unexpected := range []string{"password", "uuid", "tls", "network", "sni"} {
+		if _, exists := proxy[unexpected]; exists {
+			t.Fatalf("unexpected extra top-level field %q on MihomoFluxProxy: %#v", unexpected, proxy)
+		}
+	}
+
+	tmpl := "proxies: []\nproxy-groups:\n  - name: Proxy\n    type: select\n    proxies:\n      - " + sc.Nodes + "\nrules:\n  - MATCH,Proxy\n"
+	rendered, err := sc.Render("clash", tmpl, []map[string]any{map[string]any(proxy)}, "TestSub", nil)
+	if err != nil {
+		t.Fatalf("sc.Render clash failed: %v", err)
+	}
+	yamlOut := string(rendered)
+	for _, expected := range []string{"type: flux", "ip-strategy: dual", "public-key: hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo", "http-mode: ws", "20000-20010"} {
+		if !strings.Contains(yamlOut, expected) {
+			t.Fatalf("rendered clash YAML missing %q:\n%s", expected, yamlOut)
+		}
+	}
+}

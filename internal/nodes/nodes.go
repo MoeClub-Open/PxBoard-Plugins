@@ -65,8 +65,11 @@ func (a *app) normalize(r *http.Request, b, old p.Record) error {
 	if e := c.Validate(b, "name", "host", "engine", "protocol"); e != nil {
 		return e
 	}
-	if !c.Allowed(p.Text(b, "engine"), "xray", "sing-box", "noders") || !c.Allowed(p.Text(b, "protocol"), "vless", "vmess", "trojan", "shadowsocks", "hysteria2", "anytls", "tuic", "mieru", "sudoku", "naive") {
+	if !c.Allowed(p.Text(b, "engine"), "xray", "sing-box", "noders") || !c.Allowed(p.Text(b, "protocol"), "vless", "vmess", "trojan", "shadowsocks", "hysteria2", "anytls", "tuic", "mieru", "sudoku", "naive", "flux") {
 		return fmt.Errorf("内核或协议无效")
+	}
+	if p.Text(b, "protocol") == "flux" && p.Text(b, "engine") != "noders" {
+		return fmt.Errorf("Flux 协议请选择 NodeRS")
 	}
 	if p.Text(b, "protocol") == "hysteria2" && p.Text(b, "engine") == "xray" {
 		return fmt.Errorf("Hysteria 2 请选择 sing-box")
@@ -165,6 +168,9 @@ func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 		parent := byID[p.Text(row, "parentId")]
 		if nodeVisible(row) && (p.Bool(row, "enabled") || p.Bool(parent, "enabled")) {
 			row = subscriptionNode(row, parent)
+			if p.Text(row, "protocol") == "flux" {
+				row = sanitizeFluxSubscriptionNode(row)
+			}
 			delete(row, "agentToken")
 			delete(row, "keyPath")
 			delete(row, "certPath")

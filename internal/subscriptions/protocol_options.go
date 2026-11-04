@@ -18,6 +18,8 @@ func hysteriaObfs(options p.Record) (string, string) {
 func clashProtocolOptions(n, out p.Record) {
 	options := object(n, "protocolOptions")
 	switch p.Text(n, "protocol") {
+	case "flux":
+		clashFluxProtocolOptions(n, options, out)
 	case "hysteria2":
 		if kind, password := hysteriaObfs(options); kind != "" {
 			out["obfs"], out["obfs-password"] = kind, password

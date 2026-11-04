@@ -217,13 +217,20 @@ func first(row Row, keys ...string) any {
 }
 func supportedProtocol(protocol string) bool {
 	switch protocol {
-	case "shadowsocks", "vmess", "vless", "trojan", "hysteria2", "tuic", "anytls", "mieru", "sudoku", "naive":
+	case "shadowsocks", "vmess", "vless", "trojan", "hysteria2", "tuic", "anytls", "mieru", "sudoku", "naive", "flux":
 		return true
 	}
 	return false
 }
 
 func cAllowedTransport(protocol, transport string) bool {
+	if protocol == "flux" {
+		switch transport {
+		case "", "tcp", "raw", "udp", "quic", "http", "ws", "websocket", "httpupgrade", "h2":
+			return true
+		}
+		return false
+	}
 	if protocol == "vless" || protocol == "vmess" || protocol == "trojan" {
 		switch transport {
 		case "", "tcp", "raw", "ws", "websocket", "httpupgrade", "grpc", "h2", "http", "xhttp", "splithttp":
