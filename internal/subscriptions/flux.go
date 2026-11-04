@@ -13,21 +13,39 @@ func supportsFlux(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
+	hasExplicitTypes := false
 	for _, rawTypes := range r.URL.Query()["types"] {
-		for _, token := range strings.Split(rawTypes, ",") {
+		for _, token := range strings.FieldsFunc(rawTypes, func(c rune) bool {
+			return c == ',' || c == '|' || c == '｜' || c == ' '
+		}) {
 			t := strings.ToLower(strings.TrimSpace(token))
+			if t == "" {
+				continue
+			}
+			hasExplicitTypes = true
 			if t == "flux" || t == "all" {
 				return true
 			}
 		}
 	}
+	if hasExplicitTypes {
+		return false
+	}
+	hasExplicitHeader := false
 	for _, header := range r.Header.Values("X-XBClient-Protocols") {
 		for _, token := range strings.Split(header, ",") {
 			t := strings.ToLower(strings.TrimSpace(token))
+			if t == "" {
+				continue
+			}
+			hasExplicitHeader = true
 			if t == "flux" || t == "all" {
 				return true
 			}
 		}
+	}
+	if hasExplicitHeader {
+		return false
 	}
 	flag := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("flag")))
 	if strings.Contains(flag, "aerion") || strings.Contains(flag, "xbclient") {

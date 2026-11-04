@@ -91,6 +91,12 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 		t.Fatal("Aerion User-Agent should receive flux")
 	}
 
+	legacyXbReq := httptest.NewRequest("GET", "/s/token?flag=clash&types=anytls,hysteria,trojan,vless,vmess,mieru,sudoku", nil)
+	legacyXbReq.Header.Set("User-Agent", "Aerion")
+	if supportedFormat(node, "clash", legacyXbReq) {
+		t.Fatal("legacy XBClient with explicit types omitting flux must not receive flux")
+	}
+
 	proxy := clash(node, "separate-proxy-password", "11111111-2222-3333-4444-555555555555")
 	if proxy["type"] != "flux" || proxy["key"] != "11111111-2222-3333-4444-555555555555" {
 		t.Fatalf("unexpected flux clash proxy identity: %#v", proxy)
