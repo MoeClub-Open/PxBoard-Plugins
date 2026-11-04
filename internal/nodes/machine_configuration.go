@@ -53,7 +53,7 @@ func (a *app) configureMachine(w http.ResponseWriter, r *http.Request, machine p
 		return
 	}
 	if !c.Allowed(b.PanelType, "pxboard", "xboard") || b.Key == "" || b.MachineID < 1 {
-		p.Fail(w, 400, "目标面板类型、机器编号或密钥无效")
+		p.Fail(w, 400, "目标面板类型、服务器编号或密钥无效")
 		return
 	}
 	old, e := a.configuration(p.Text(machine, "id"))
@@ -61,7 +61,7 @@ func (a *app) configureMachine(w http.ResponseWriter, r *http.Request, machine p
 		return
 	}
 	if p.Text(old, "status") == "pending" {
-		p.Fail(w, 409, "此机器已有等待处理的配置")
+		p.Fail(w, 409, "此服务器已有等待处理的配置")
 		return
 	}
 	row := p.Record{
@@ -144,7 +144,7 @@ func (a *app) listMachineConfigurations(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	out := []p.Record{}
-	labels := map[string]string{"pending": "等待节点处理", "applied": "已应用", "failed": "应用失败"}
+	labels := map[string]string{"pending": "等待服务器处理", "applied": "已应用", "failed": "应用失败"}
 	for _, row := range rows {
 		config, _ := row["config"].(map[string]any)
 		panel, _ := config["panel"].(map[string]any)

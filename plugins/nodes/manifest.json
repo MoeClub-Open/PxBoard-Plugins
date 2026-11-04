@@ -20,7 +20,7 @@
     "access": ">=1!0.0.1"
   },
   "homepage": "",
-  "description": "NodeRS 原生接入、节点配置、面板迁移、流量回报与状态监控",
+  "description": "NodeRS 服务器接入、节点配置、面板迁移、流量回报与服务器监控",
   "pages": [
     {
       "title": "节点管理",
@@ -32,7 +32,7 @@
       "group": "连接"
     },
     {
-      "title": "机器",
+      "title": "服务器管理",
       "id": "machines",
       "icon": "server",
       "roles": [
@@ -48,12 +48,12 @@
       "id": "status",
       "group": "连接",
       "icon": "server",
-      "title": "节点状态",
+      "title": "服务器监控",
       "capability": "portal.status"
     },
     {
       "id": "settings",
-      "title": "节点设置",
+      "title": "状态展示设置",
       "icon": "server",
       "roles": [
         "admin"

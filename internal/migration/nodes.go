@@ -12,7 +12,7 @@ import (
 
 func (m *mapper) newKey(label string) string {
 	if m.Options.Seed == "" {
-		m.fail("生成迁移机器密钥需要持久任务种子")
+		m.fail("生成迁移服务器密钥需要持久任务种子")
 		return ""
 	}
 	mac := hmac.New(sha256.New, []byte(m.Options.Seed))
@@ -26,7 +26,7 @@ func (m *mapper) v2Nodes() {
 	for _, row := range rows {
 		number := integer(row, "id")
 		if number <= 0 || truth(row, "is_active") && text(row, "token") == "" {
-			m.fail("机器 %s 的编号或接入密钥无效", text(row, "name"))
+			m.fail("服务器 %s 的编号或接入密钥无效", text(row, "name"))
 		}
 		nextMachine = max(nextMachine, number)
 		m.Machines[text(row, "id")] = true
@@ -37,7 +37,7 @@ func (m *mapper) v2Nodes() {
 		host := text(row, "host")
 		machine := integer(row, "machine_id")
 		if machine > 0 && !m.Machines[strconv.FormatInt(machine, 10)] {
-			m.fail("节点 %s 引用了不存在的机器 %d", text(row, "name"), machine)
+			m.fail("节点 %s 引用了不存在的服务器 %d", text(row, "name"), machine)
 		}
 		if machine == 0 {
 			machine = byHost[host]

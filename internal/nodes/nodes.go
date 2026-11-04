@@ -2,10 +2,12 @@ package nodes
 
 import (
 	"fmt"
-	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
-	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"net/http"
 	"reflect"
+	"time"
+
+	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
+	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
 type app struct{ *c.App }
@@ -31,7 +33,11 @@ func New() http.Handler {
 			return nil, e
 		}
 		machines, e := a.C.List("machines")
-		return []p.Metric{{Label: "在线节点", Value: onlineCount(rows, machines)}, {Label: "全部节点", Value: len(primaryNodes(rows))}}, e
+		return []p.Metric{
+			{Label: "在线服务器", Value: onlineServerCount(machines, time.Now())},
+			{Label: "全部服务器", Value: len(machines)},
+			{Label: "主节点", Value: len(primaryNodes(rows))},
+		}, e
 	})
 	a.Mux.HandleFunc("POST /nodes/{id}/rotate", a.rotate)
 	a.Mux.HandleFunc("POST /agent/sync", a.sync)
@@ -72,7 +78,7 @@ func (a *app) normalize(r *http.Request, b, old p.Record) error {
 		return fmt.Errorf("此协议请选择 NodeRS")
 	}
 	if p.Text(b, "engine") == "noders" && p.Number(b, "machineId") == 0 {
-		return fmt.Errorf("请选择接入机器")
+		return fmt.Errorf("请选择所属服务器")
 	}
 	if p.Text(b, "protocol") == "shadowsocks" && p.Text(b, "engine") == "sing-box" {
 		return fmt.Errorf("多用户 Shadowsocks 请选择 Xray")
@@ -91,13 +97,21 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	if e != nil {
 		return p.View{}, e
 	}
-	mf := c.Field("machineId", "接入机器（NodeRS）", "select", false)
+	sortServers(machines)
+	serverOptions := make([]p.Option, 0, len(machines))
+	for _, machine := range machines {
+		serverOptions = append(serverOptions, p.Option{Label: fmt.Sprintf("%.0f · %s", p.Number(machine, "number"), p.Text(machine, "name")), Value: machine["number"]})
+	}
+	mf := c.Field("machineId", "所属服务器", "select", false)
 	mf.Required = true
 	mf.When = map[string][]string{"engine": {"noders"}}
-	for _, machine := range machines {
-		mf.Options = append(mf.Options, p.Option{Label: fmt.Sprintf("%.0f · %s", p.Number(machine, "number"), p.Text(machine, "name")), Value: machine["number"]})
-	}
+	mf.Options = serverOptions
 	res.Fields = append(res.Fields, mf)
+	for i := range res.Columns {
+		if res.Columns[i].Key == "machineId" {
+			res.Columns[i].Options = serverOptions
+		}
+	}
 	for i := range res.Fields {
 		switch res.Fields[i].Key {
 		case "port":
@@ -115,7 +129,11 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		}
 	}
 	rows, e := a.C.List("nodes")
-	return p.View{Title: "节点管理", Metrics: []p.Metric{{Label: "全部节点", Value: len(primaryNodes(rows))}, {Label: "在线节点", Value: onlineCount(rows, machines)}, {Label: "连接地址", Value: len(rows)}}, Resources: []p.Resource{res, groupResource()}}, e
+	return p.View{
+		Title:     "节点管理",
+		Metrics:   []p.Metric{{Label: "主节点", Value: len(primaryNodes(rows))}, {Label: "连接地址", Value: len(rows)}, {Label: "关联服务器", Value: len(machines)}},
+		Resources: []p.Resource{res, groupResource()},
+	}, e
 }
 func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {

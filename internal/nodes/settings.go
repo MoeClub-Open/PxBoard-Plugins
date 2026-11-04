@@ -9,8 +9,27 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-var statusOptions = []p.Option{{Label: "地区", Value: "region"}, {Label: "协议", Value: "protocol"}, {Label: "在线状态", Value: "status"}, {Label: "流量倍率", Value: "trafficRate"}, {Label: "最近心跳", Value: "lastSeen"}, {Label: "CPU 使用率", Value: "cpuPercent"}, {Label: "内存使用率", Value: "memoryPercent"}, {Label: "磁盘使用率", Value: "diskPercent"}, {Label: "交换空间使用率", Value: "swapPercent"}, {Label: "在线账户数", Value: "onlineAccounts"}}
-var defaultStatusFields = []string{"region", "protocol", "status", "trafficRate", "lastSeen"}
+var statusOptions = []p.Option{
+	{Label: "地区", Value: "region"},
+	{Label: "在线状态", Value: "status"},
+	{Label: "运行节点数", Value: "nodeCount"},
+	{Label: "CPU 使用率", Value: "cpuPercent"},
+	{Label: "内存使用率", Value: "memoryPercent"},
+	{Label: "磁盘使用率", Value: "diskPercent"},
+	{Label: "交换空间使用率", Value: "swapPercent"},
+	{Label: "在线账户数", Value: "onlineAccounts"},
+	{Label: "最近心跳", Value: "lastSeen"},
+}
+var defaultStatusFields = []string{"status", "cpuPercent", "memoryPercent", "diskPercent", "lastSeen"}
+
+func validStatusField(key string) bool {
+	for _, option := range statusOptions {
+		if option.Value == key {
+			return true
+		}
+	}
+	return false
+}
 
 func (a *app) settingsAPI() {
 	a.Mux.HandleFunc("GET /settings", a.settings)
@@ -46,6 +65,7 @@ func (a *app) config() (p.Record, error) {
 			break
 		}
 	}
+	config["userStatusFields"] = selectedStatusFields(config)
 	return config, nil
 }
 
@@ -73,15 +93,8 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 	}
 	if b.UserStatusFields != nil {
 		for _, field := range *b.UserStatusFields {
-			valid := false
-			for _, option := range statusOptions {
-				if option.Value == field {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				p.Fail(w, 400, "节点状态展示项无效")
+			if !validStatusField(field) {
+				p.Fail(w, 400, "服务器状态展示项无效")
 				return
 			}
 		}
@@ -94,24 +107,33 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) settingsView(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
-		return p.View{}, fmt.Errorf("仅管理员可修改节点设置")
+		return p.View{}, fmt.Errorf("仅管理员可修改状态展示设置")
 	}
-	field := p.Field{Key: "userStatusEnabled", Label: "向用户展示节点状态", Type: "boolean", Default: true}
+	field := p.Field{Key: "userStatusEnabled", Label: "向用户展示服务器状态", Type: "boolean", Default: true}
 	fields := p.Field{Key: "userStatusFields", Label: "用户可见的状态项目", Type: "multiselect", Options: statusOptions, Default: defaultStatusFields}
-	return p.View{Title: "节点设置", Resources: []p.Resource{{Key: "settings", Title: "用户前台", Endpoint: "/settings", Singleton: true, Editable: true, Columns: []p.Field{field, fields}, Fields: []p.Field{field, fields}}}}, nil
+	return p.View{Title: "状态展示设置", Resources: []p.Resource{{Key: "settings", Title: "用户前台展示", Endpoint: "/settings", Singleton: true, Editable: true, Columns: []p.Field{field, fields}, Fields: []p.Field{field, fields}}}}, nil
 }
 
 func selectedStatusFields(config p.Record) []string {
-	result := []string{}
+	raw := []string{}
 	switch fields := config["userStatusFields"].(type) {
 	case []string:
-		result = fields
+		raw = fields
 	case []any:
 		for _, v := range fields {
 			if s, ok := v.(string); ok {
-				result = append(result, s)
+				raw = append(raw, s)
 			}
 		}
+	}
+	result := make([]string, 0, len(raw))
+	for _, field := range raw {
+		if validStatusField(field) && !slices.Contains(result, field) {
+			result = append(result, field)
+		}
+	}
+	if len(raw) > 0 && len(result) == 0 {
+		return slices.Clone(defaultStatusFields)
 	}
 	return result
 }
@@ -148,7 +170,7 @@ func (a *app) requireUserStatus(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	if !p.Bool(config, "userStatusEnabled") {
-		p.Fail(w, 404, "节点状态暂未开放")
+		p.Fail(w, 404, "服务器状态暂未开放")
 		return false
 	}
 	return true

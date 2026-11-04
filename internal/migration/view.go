@@ -34,7 +34,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		{Key: "passwordMethod", Label: "旧密码算法", Type: "select", Default: "auto", Options: []p.Option{{Label: "自动识别编码密码 / 使用源字段", Value: "auto"}, {Label: "bcrypt", Value: "bcrypt"}, {Label: "Argon2id", Value: "argon2id"}, {Label: "Argon2i", Value: "argon2i"}, {Label: "MD5", Value: "md5"}, {Label: "MD5 + 盐", Value: "md5salt"}, {Label: "SHA256", Value: "sha256"}, {Label: "SHA256 + 盐", Value: "sha256salt"}, {Label: "SHA3-256 + 盐", Value: "sha3salt"}}},
 		{Key: "passwordSalt", Label: "旧密码盐（如适用）", Type: "password", When: map[string][]string{"passwordMethod": {"auto", "md5salt", "sha256", "sha256salt", "sha3salt"}}},
 	}...)
-	fields = append(fields, p.Field{Key: "includeNodes", Label: "同时导入节点和机器", Type: "boolean", Default: false})
+	fields = append(fields, p.Field{Key: "includeNodes", Label: "同时导入节点和服务器", Type: "boolean", Default: false})
 	fields = append(fields, p.Field{Key: "includeAffiliate", Label: "同时导入推广关系与佣金（需启用推广插件）", Type: "boolean", Default: false})
 	if a.Source != "sspanel" {
 		fields = append(fields, p.Field{Key: "includeHistory", Label: "历史订单", Type: "boolean", Default: true})

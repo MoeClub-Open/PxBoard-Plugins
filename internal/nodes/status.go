@@ -1,14 +1,20 @@
 package nodes
 
 import (
+	"math"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-const heartbeatTimeout = 120 * time.Second
+const (
+	heartbeatTimeout = 120 * time.Second
+	telemetryTimeout = 180 * time.Second
+)
 
 func (a *app) monitoring() {
 	a.Mux.HandleFunc("GET /status", a.status)
@@ -47,83 +53,85 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 	}
 	accounts := []p.Record{}
 	if mine {
+		userID := p.Subject(r).ID
 		var all []p.Record
-		if c.Err(w, a.C.Call("access", "GET", "/internal/clients", nil, &all)) {
+		if c.Err(w, a.C.Call("access", "GET", "/internal/clients?userId="+url.QueryEscape(userID), nil, &all)) {
 			return
 		}
 		for _, account := range all {
-			if p.Text(account, "userId") == p.Subject(r).ID {
+			if p.Text(account, "userId") == userID {
 				accounts = append(accounts, account)
 			}
 		}
 	}
-	out := []p.Record{}
-	serviceRows := map[string]int{}
+	rows, _ := buildServerStatuses(machines, nodes, accounts, mine, fields, time.Now())
+	p.JSON(w, rows)
+}
+
+func buildServerStatuses(machines, nodes, accounts []p.Record, mine bool, fields []string, now time.Time) ([]p.Record, int) {
+	sorted := make([]p.Record, len(machines))
+	copy(sorted, machines)
+	sortServers(sorted)
+
 	byID := map[string]p.Record{}
 	for _, node := range nodes {
 		byID[p.Text(node, "id")] = node
 	}
+	serviceByServer := map[int64][]p.Record{}
+	entriesByServer := map[int64][]p.Record{}
 	for _, node := range nodes {
 		parent := byID[p.Text(node, "parentId")]
-		enabled := p.Bool(node, "enabled") || p.Bool(parent, "enabled")
-		telemetryNode := node
+		service := node
 		if !p.Bool(node, "enabled") && parent != nil {
-			telemetryNode = parent
+			service = parent
 		}
+		if p.Text(service, "engine") != "noders" {
+			continue
+		}
+		num := int64(p.Number(service, "machineId"))
+		entriesByServer[num] = append(entriesByServer[num], node)
+		if p.Bool(node, "enabled") {
+			serviceByServer[num] = append(serviceByServer[num], node)
+		}
+	}
+
+	out := make([]p.Record, 0, len(sorted))
+	globalAccounts := map[int64]bool{}
+	extraUnnamed := 0
+	for _, machine := range sorted {
+		num := int64(p.Number(machine, "number"))
 		if mine {
-			allowed := false
-			for _, account := range accounts {
-				if nodeVisible(node) && enabled && c.CanUse(account, node) && (p.Bool(node, "enabled") || parent == nil || c.CanUse(account, parent)) {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
+			if !p.Bool(machine, "enabled") || !serverAccessible(entriesByServer[num], byID, accounts) {
 				continue
 			}
 		}
-		var machine p.Record
-		if p.Text(telemetryNode, "engine") == "noders" {
-			for _, candidate := range machines {
-				if p.Number(candidate, "number") == p.Number(telemetryNode, "machineId") {
-					machine = candidate
-					break
-				}
-			}
+		row, activeIDs, unnamed := serverStatus(machine, serviceByServer[num], now)
+		for id := range activeIDs {
+			globalAccounts[id] = true
 		}
-		statusNode := telemetryNode
-		if !p.Bool(node, "enabled") && parent != nil {
-			statusNode = p.Record{}
-			for key, value := range parent {
-				statusNode[key] = value
-			}
-			for _, key := range []string{"id", "name", "region", "protocol", "trafficRate"} {
-				statusNode[key] = node[key]
-			}
-		}
-		row := nodeStatus(statusNode, machine, true)
+		extraUnnamed += unnamed
 		if mine {
 			row = filterUserStatus(row, fields)
 		}
-		if parent != nil && admin && !mine {
-			if !p.Bool(node, "enabled") {
-				row["parentId"] = parent["id"]
-			}
-			row["parentName"] = parent["name"]
-		}
-		if mine {
-			serviceID := p.Text(telemetryNode, "id")
-			if index, exists := serviceRows[serviceID]; exists {
-				if p.Text(node, "id") == serviceID {
-					out[index] = row
-				}
-				continue
-			}
-			serviceRows[serviceID] = len(out)
-		}
 		out = append(out, row)
 	}
-	p.JSON(w, out)
+	return out, len(globalAccounts) + extraUnnamed
+}
+
+func serverAccessible(entries []p.Record, byID map[string]p.Record, accounts []p.Record) bool {
+	for _, node := range entries {
+		parent := byID[p.Text(node, "parentId")]
+		enabled := p.Bool(node, "enabled") || p.Bool(parent, "enabled")
+		if !nodeVisible(node) || !enabled {
+			continue
+		}
+		for _, account := range accounts {
+			if c.CanUse(account, node) && (p.Bool(node, "enabled") || parent == nil || c.CanUse(account, parent)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func primaryNodes(nodes []p.Record) []p.Record {
@@ -140,111 +148,191 @@ func primaryNodes(nodes []p.Record) []p.Record {
 	return primary
 }
 
-func onlineCount(nodes, machines []p.Record) int {
-	byNumber := map[float64]p.Record{}
-	for _, machine := range machines {
-		byNumber[p.Number(machine, "number")] = machine
-	}
+func onlineServerCount(machines []p.Record, now time.Time) int {
 	online := 0
-	for _, node := range primaryNodes(nodes) {
-		var machine p.Record
-		if p.Text(node, "engine") == "noders" {
-			machine = byNumber[p.Number(node, "machineId")]
-		}
-		if p.Text(nodeStatus(node, machine, false), "status") == "online" {
+	for _, machine := range machines {
+		state, _, _ := serverHeartbeatState(machine, now)
+		if state == "online" {
 			online++
 		}
 	}
 	return online
 }
 
-func nodeStatus(node, machine p.Record, details bool) p.Record {
+func serverHeartbeatState(machine p.Record, now time.Time) (string, string, int) {
+	if !p.Bool(machine, "enabled") {
+		return "disabled", "已停用", -1
+	}
 	status, label := "never", "未接入"
-	lastSeen := p.Text(node, "lastSeen")
+	lastSeen := p.Text(machine, "lastSeen")
 	seen, e := time.Parse(time.RFC3339, lastSeen)
+	age := -1
 	if e == nil {
 		status, label = "offline", "离线"
-		if time.Since(seen) < heartbeatTimeout {
+		age = max(0, int(now.Sub(seen).Seconds()))
+		if now.Sub(seen) < heartbeatTimeout {
 			status, label = "online", "在线"
 		}
 	}
-	if status == "online" && p.Text(node, "error") != "" {
-		status, label = "error", "运行异常"
+	return status, label, age
+}
+
+func roundPercent(value float64) float64 {
+	return math.Round(value*10) / 10
+}
+
+func serverStatus(machine p.Record, serviceNodes []p.Record, now time.Time) (p.Record, map[int64]bool, int) {
+	status, label, age := serverHeartbeatState(machine, now)
+	enabled := p.Bool(machine, "enabled")
+	nodeCount := 0
+	if enabled {
+		nodeCount = len(serviceNodes)
 	}
-	enabled := p.Bool(node, "enabled") && (machine == nil || p.Bool(machine, "enabled"))
-	if !enabled {
-		status, label = "disabled", "已停用"
+	region := strings.TrimSpace(p.Text(machine, "region"))
+	if region == "" {
+		for _, n := range serviceNodes {
+			if r := strings.TrimSpace(p.Text(n, "region")); r != "" {
+				region = r
+				break
+			}
+		}
 	}
-	row := p.Record{"id": node["id"], "name": node["name"], "region": node["region"], "protocol": node["protocol"], "status": status, "statusLabel": label, "enabled": enabled, "lastSeen": lastSeen, "trafficRate": node["trafficRate"]}
-	if !details {
-		return row
+	row := p.Record{
+		"id":          machine["id"],
+		"number":      machine["number"],
+		"name":        machine["name"],
+		"status":      status,
+		"statusLabel": label,
+		"enabled":     enabled,
+		"nodeCount":   nodeCount,
+		"lastSeen":    p.Text(machine, "lastSeen"),
 	}
-	row["engine"] = node["engine"]
-	row["error"] = node["error"]
-	if e == nil {
-		row["heartbeatAgeSeconds"] = max(0, int(time.Since(seen).Seconds()))
+	if region != "" {
+		row["region"] = region
 	}
-	if machine != nil {
-		row["machineName"] = machine["name"]
-		row["machineLastSeen"] = machine["lastSeen"]
+	if age >= 0 {
+		row["heartbeatAgeSeconds"] = age
 	}
-	telemetry, _ := node["status"].(map[string]any)
-	updated := p.Text(node, "statusUpdatedAt")
-	if telemetry == nil && machine != nil {
-		telemetry, _ = machine["status"].(map[string]any)
-		updated = p.Text(machine, "statusUpdatedAt")
+	activeAccounts := map[int64]bool{}
+	unnamedAccounts := 0
+	if status != "online" {
+		return row, activeAccounts, 0
 	}
-	if telemetry != nil && updated != "" {
+	telemetry, _ := machine["status"].(map[string]any)
+	updated := p.Text(machine, "statusUpdatedAt")
+	if updatedAt, e := time.Parse(time.RFC3339, updated); telemetry != nil && e == nil && now.Sub(updatedAt) < telemetryTimeout {
 		row["loadUpdatedAt"] = updated
-		if value, ok := telemetry["cpuPercent"]; ok {
-			row["cpuPercent"] = value
+		if value, ok := telemetry["cpuPercent"]; ok && value != nil {
+			row["cpuPercent"] = roundPercent(p.Number(telemetry, "cpuPercent"))
 		}
 		for _, spec := range []struct{ source, key string }{{"memory", "memory"}, {"disk", "disk"}, {"swap", "swap"}} {
 			stat, _ := telemetry[spec.source].(map[string]any)
 			if total := p.Number(stat, "total"); total > 0 {
 				used := p.Number(stat, "used")
-				row[spec.key+"Percent"] = used / total * 100
+				row[spec.key+"Percent"] = roundPercent(used / total * 100)
 				row[spec.key+"UsedBytes"] = used
 				row[spec.key+"TotalBytes"] = total
 			}
 		}
 	}
-	if aliveAt, e := time.Parse(time.RFC3339, p.Text(node, "onlineUpdatedAt")); e == nil && time.Since(aliveAt) < heartbeatTimeout {
+	hasAliveReport := false
+	for _, node := range serviceNodes {
+		aliveAt, e := time.Parse(time.RFC3339, p.Text(node, "onlineUpdatedAt"))
+		if e != nil || now.Sub(aliveAt) >= telemetryTimeout {
+			continue
+		}
+		hasAliveReport = true
 		accounts, _ := node["onlineAccounts"].([]any)
-		count := 0
 		for _, value := range accounts {
 			account, _ := value.(map[string]any)
 			ips, _ := account["ips"].([]any)
 			if len(ips) > 0 {
-				count++
-			}
-		}
-		row["onlineAccounts"] = count
-	}
-	return row
-}
-
-func (a *app) statusView(r *http.Request) (p.View, error) {
-	columns := []p.Field{c.Field("name", "节点", "text", false), c.Field("region", "地区", "text", false), c.Field("protocol", "协议", "tag", false), c.Field("statusLabel", "状态", "text", false), c.Field("trafficRate", "流量倍率", "number", false), c.Field("lastSeen", "最近心跳", "datetime", false)}
-	if p.Admin(r) {
-		columns = append(columns, c.Field("machineName", "机器", "text", false), c.Field("parentName", "共用节点", "text", false), c.Field("onlineAccounts", "在线账户", "number", false), c.Field("cpuPercent", "CPU（%）", "number", false), c.Field("memoryPercent", "内存（%）", "number", false), c.Field("diskPercent", "磁盘（%）", "number", false), c.Field("loadUpdatedAt", "负载更新时间", "datetime", false), c.Field("error", "运行错误", "text", false))
-	} else {
-		config, err := a.config()
-		if err != nil {
-			return p.View{}, err
-		}
-		columns = []p.Field{c.Field("name", "节点", "text", false)}
-		for _, key := range selectedStatusFields(config) {
-			for _, option := range statusOptions {
-				if option.Value == key {
-					column := key
-					if key == "status" {
-						column = "statusLabel"
-					}
-					columns = append(columns, c.Field(column, option.Label, "text", false))
+				if id := int64(p.Number(account, "accountId")); id > 0 {
+					activeAccounts[id] = true
+				} else {
+					unnamedAccounts++
 				}
 			}
 		}
 	}
-	return p.View{Title: "节点状态", Resources: []p.Resource{{Renderer: "node-status", Key: "status", Title: "节点", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无可查看的节点"}}}, nil
+	if hasAliveReport {
+		row["onlineAccounts"] = len(activeAccounts) + unnamedAccounts
+	}
+	return row, activeAccounts, unnamedAccounts
+}
+
+func (a *app) statusView(r *http.Request) (p.View, error) {
+	if p.Admin(r) {
+		machines, e := a.C.List("machines")
+		if e != nil {
+			return p.View{}, e
+		}
+		nodes, e := a.C.List("nodes")
+		if e != nil {
+			return p.View{}, e
+		}
+		now := time.Now()
+		rows, onlineUsers := buildServerStatuses(machines, nodes, nil, false, nil, now)
+		hasRegion := false
+		for _, row := range rows {
+			if p.Text(row, "region") != "" {
+				hasRegion = true
+				break
+			}
+		}
+		online := onlineServerCount(machines, now)
+		columns := []p.Field{
+			c.Field("number", "编号", "number", false),
+			c.Field("name", "服务器", "text", false),
+		}
+		if hasRegion {
+			columns = append(columns, c.Field("region", "地区", "text", false))
+		}
+		columns = append(columns,
+			c.Field("status", "状态", "status", false),
+			c.Field("nodeCount", "运行节点", "number", false),
+			c.Field("onlineAccounts", "在线账户", "number", false),
+			c.Field("cpuPercent", "CPU（%）", "number", false),
+			c.Field("memoryPercent", "内存（%）", "number", false),
+			c.Field("diskPercent", "磁盘（%）", "number", false),
+			c.Field("swapPercent", "交换空间（%）", "number", false),
+			c.Field("lastSeen", "最近心跳", "datetime", false),
+		)
+		metrics := []p.Metric{
+			{Label: "全部服务器", Value: len(machines)},
+			{Label: "在线服务器", Value: online},
+			{Label: "离线或停用", Value: len(machines) - online},
+			{Label: "在线账户", Value: onlineUsers},
+		}
+		return p.View{
+			Title:     "服务器监控",
+			Metrics:   metrics,
+			Resources: []p.Resource{{Key: "status", Title: "服务器", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无服务器"}},
+		}, nil
+	}
+	config, err := a.config()
+	if err != nil {
+		return p.View{}, err
+	}
+	columns := []p.Field{c.Field("name", "服务器", "text", false)}
+	for _, key := range selectedStatusFields(config) {
+		for _, option := range statusOptions {
+			if option.Value == key {
+				kind := "number"
+				switch key {
+				case "region":
+					kind = "text"
+				case "status":
+					kind = "status"
+				case "lastSeen":
+					kind = "datetime"
+				}
+				columns = append(columns, c.Field(key, option.Label, kind, false))
+			}
+		}
+	}
+	return p.View{
+		Title:     "服务器状态",
+		Resources: []p.Resource{{Key: "status", Title: "服务器", Endpoint: "/status", PollIntervalSeconds: 10, Columns: columns, Empty: "暂无可查看的服务器"}},
+	}, nil
 }

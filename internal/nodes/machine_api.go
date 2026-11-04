@@ -151,8 +151,8 @@ func (a *app) machineTraffic(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, a.C.Put("reports", p.Record{"id": id, "machineId": m["number"], "nodeId": n["wireId"], "batchId": b.BatchID, "accounts": b.Accounts, "trafficRate": n["trafficRate"], "createdAt": c.Now()})) {
 		return
 	}
-	n["lastSeen"] = c.Now()
-	if c.Err(w, a.C.Put("nodes", n)) {
+	m["lastSeen"] = c.Now()
+	if c.Err(w, a.C.Put("machines", m)) {
 		return
 	}
 	p.JSON(w, p.Record{"accepted": true})
@@ -166,10 +166,11 @@ func (a *app) machineTelemetry(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, p.Decode(r, &b)) {
 		return
 	}
-	m["lastSeen"] = c.Now()
+	now := c.Now()
+	m["lastSeen"] = now
 	if r.PathValue("node") == "" {
 		m["status"] = b
-		m["statusUpdatedAt"] = c.Now()
+		m["statusUpdatedAt"] = now
 		if !c.Err(w, a.C.Put("machines", m)) {
 			p.JSON(w, true)
 		}
@@ -179,15 +180,25 @@ func (a *app) machineTelemetry(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n["lastSeen"] = c.Now()
 	if accounts, ok := b["accounts"]; ok {
+		if c.Err(w, a.C.Put("machines", m)) {
+			return
+		}
 		n["onlineAccounts"] = accounts
-		n["onlineUpdatedAt"] = c.Now()
-	} else {
-		n["status"] = b
-		n["statusUpdatedAt"] = c.Now()
+		n["onlineUpdatedAt"] = now
+		delete(n, "status")
+		delete(n, "statusUpdatedAt")
+		delete(n, "lastSeen")
+		if !c.Err(w, a.C.Put("nodes", n)) {
+			p.JSON(w, true)
+		}
+		return
 	}
-	if !c.Err(w, a.C.Put("nodes", n)) {
+	if m["status"] == nil {
+		m["status"] = b
+		m["statusUpdatedAt"] = now
+	}
+	if !c.Err(w, a.C.Put("machines", m)) {
 		p.JSON(w, true)
 	}
 }

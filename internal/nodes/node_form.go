@@ -10,7 +10,6 @@ var tlsProtocols = []string{"vless", "vmess", "trojan", "hysteria2", "anytls", "
 func resource() p.Resource {
 	fields := []p.Field{
 		c.Field("name", "节点名称", "text", true),
-		c.Field("region", "地区", "text", false),
 		c.Select("engine", "代理内核", "noders|NodeRS", "xray|Xray", "sing-box|sing-box"),
 		c.Select("protocol", "协议", "anytls|AnyTLS", "mieru|Mieru", "vless|VLESS", "vmess|VMess", "trojan|Trojan", "shadowsocks|Shadowsocks", "hysteria2|Hysteria 2", "tuic|TUIC", "sudoku|Sudoku", "naive|Naive"),
 		c.Field("host", "连接地址", "text", true),
@@ -27,11 +26,21 @@ func resource() p.Resource {
 		c.GroupField("groups", "节点分组", true),
 		c.Field("trafficRate", "流量倍率", "number", true),
 		p.Field{Key: "visible", Label: "在订阅中显示", Type: "boolean", Default: true},
-		p.Field{Key: "enabled", Label: "启用独立服务", Type: "boolean", Hint: "关闭后不在机器上单独运行；复用主节点的入口仍由主节点提供服务"},
+		p.Field{Key: "enabled", Label: "启用独立服务", Type: "boolean", Hint: "关闭后不在服务器上单独运行；复用主节点的入口仍由主节点提供服务"},
 	)
 	return p.Resource{Renderer: "node-connections",
 		Key: "nodes", Title: "节点", Endpoint: "/nodes", CreateLabel: "添加节点", Editable: true, Deletable: true,
-		Columns: []p.Field{c.Field("name", "节点名称", "text", false), c.Field("region", "地区", "text", false), c.Field("host", "服务器", "text", false), c.GroupField("groups", "节点分组", false), c.Field("protocol", "协议", "tag", false), c.Field("lastSeen", "最近在线", "datetime", false), c.Field("error", "运行错误", "text", false), c.Field("visible", "订阅显示", "boolean", false), c.Field("enabled", "运行方式", "nodeService", false)},
+		Columns: []p.Field{
+			c.Field("name", "节点名称", "text", false),
+			c.Field("host", "连接地址", "text", false),
+			c.Field("port", "端口", "number", false),
+			c.Field("protocol", "协议", "tag", false),
+			c.Field("machineId", "所属服务器", "select", false),
+			c.GroupField("groups", "节点分组", false),
+			c.Field("trafficRate", "倍率", "number", false),
+			c.Field("visible", "订阅显示", "boolean", false),
+			c.Field("enabled", "运行方式", "nodeService", false),
+		},
 		Fields:  fields, Actions: []p.Action{{Key: "rotate", Label: "接入令牌", Confirm: "生成新的节点接入令牌？原令牌会立即失效。"}},
 	}
 }
