@@ -467,8 +467,11 @@ func clashFluxProtocolOptions(n, options, out p.Record) {
 			if chFP != "" && chFP != "inherit" {
 				entry["client-fingerprint"] = chFP
 			}
-			if p.Bool(ch, "insecure") || p.Bool(ch, "allow_insecure") || p.Bool(ch, "skip-cert-verify") {
-				entry["skip-cert-verify"] = true
+			for _, key := range []string{"insecure", "allow_insecure", "skip-cert-verify"} {
+				if value, exists := ch[key]; exists && value != nil {
+					entry["skip-cert-verify"] = p.Bool(ch, key)
+					break
+				}
 			}
 			if alpn := ch["alpn"]; alpn != nil {
 				entry["alpn"] = alpn

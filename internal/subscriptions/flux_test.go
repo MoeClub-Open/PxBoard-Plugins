@@ -139,3 +139,28 @@ func TestFluxIndependentKeyInheritsNodeShortID(t *testing.T) {
 		t.Fatalf("missing inherited short ID: %v", reality)
 	}
 }
+
+func TestFluxChannelCanEnableCertificateVerification(t *testing.T) {
+	for _, key := range []string{"insecure", "allow_insecure", "skip-cert-verify"} {
+		t.Run(key, func(t *testing.T) {
+			node := p.Record{"name": "Flux", "protocol": "flux", "host": "edge.example.com", "port": 443.0,
+				"tlsSettings": map[string]any{"allow_insecure": true},
+				"protocolOptions": map[string]any{"security": "tls", "channels": []any{
+					map[string]any{"id": "inherit", "transport": "tcp"},
+					map[string]any{"id": "verified", "transport": "tcp", key: false},
+					map[string]any{"id": "insecure", "transport": "tcp", key: true},
+				}}}
+			result := clash(node, "password", "user-id")
+			channels := result["channels"].([]p.Record)
+			if result["skip-cert-verify"] != true {
+				t.Fatal("missing node default")
+			}
+			if _, exists := channels[0]["skip-cert-verify"]; exists {
+				t.Fatal("unset channel option must inherit")
+			}
+			if channels[1]["skip-cert-verify"] != false || channels[2]["skip-cert-verify"] != true {
+				t.Fatal("explicit channel certificate verification setting was lost")
+			}
+		})
+	}
+}
