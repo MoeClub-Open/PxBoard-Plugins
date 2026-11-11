@@ -164,18 +164,18 @@ for (const claim of claims) {
 }
 
 const token = process.env.PX_REDEEM_ADMIN_TOKEN
-async function request(path: string, body?: Row): Promise<any> {
-  const response = await fetch(new URL('/api/v1' + path, panel), {
-    method: body ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+async function request(procedure: string, body: Row = {}): Promise<any> {
+  const response = await fetch(new URL('/rpc/v1/' + procedure, panel), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
   const result = await response.json() as APIResult
   if (!response.ok) throw new Error(result.error?.message || `请求失败：${response.status}`)
   if (result.data?.status === 'blocked' || result.data?.errors?.length) throw new Error('目标检查未通过，未完成升级')
   return result.data
 }
-const plugins = await request('/plugins') as Row[]
+const plugins = await request('core/plugins.list') as Row[]
 if (!plugins.some((row) => row.id === 'redeem' && row.enabled)) throw new Error('请先安装并启用兑换码插件')
 if (values.apply && plugins.some((row) => row.id === 'sharing' && row.enabled)) {
   throw new Error('提交前请停用旧 sharing 插件，避免旧接口继续发放权益')
@@ -188,17 +188,17 @@ if (values.apply && gifts.length) {
   }
 }
 const migrationId = values['migration-id']!
-if (values.apply) await request('/extensions/redeem/migration/start', {
+if (values.apply) await request('redeem/migration.start', {
   migrationId, codeCount: codes.length, claimCount: claims.length,
 })
 for (const [collection, rows] of [['codes', codes], ['claims', claims]] as const) {
   for (let offset = 0; offset < rows.length; offset += 200) {
-    await request('/extensions/redeem/migration/import', {
+    await request('redeem/migration.import', {
       migrationId, dryRun: !values.apply, codeIds, [collection]: rows.slice(offset, offset + 200),
     })
   }
 }
-if (values.apply) await request('/extensions/redeem/migration/finish', { migrationId })
+if (values.apply) await request('redeem/migration.finish', { migrationId })
 process.stdout.write(JSON.stringify({
   mode: values.apply ? 'applied' : 'dry-run', migrationId,
   codes: codes.length, claims: claims.length,

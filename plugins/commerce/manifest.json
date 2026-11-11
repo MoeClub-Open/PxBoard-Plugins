@@ -10,8 +10,8 @@
     "access": ">=1!0.0.1"
   },
   "id": "commerce",
-  "publicPaths": [
-    "/public"
+  "publicProcedures": [
+    "public.currency"
   ],
   "pages": [
     {

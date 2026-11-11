@@ -22,7 +22,7 @@
 
 ## 内部接口
 
-以下路径位于 `/api/v1/extensions/access` 下，由核心校验调用插件权限。普通用户不能直接调用。
+对外管理与用户偏好通过 `POST /rpc/v1/access/{method}` 调用（`accounts.list`、`accounts.create`、`accounts.update`、`accounts.reset`、`accounts.suspend`、`preferences.get`、`preferences.update`、`reminderSettings.list`、`reminderSettings.update`）。以下跨插件接口经本机运行时通道 `/api/v1/runtime/call/access/...` 调用，由核心校验调用插件权限，普通用户不能直接调用：
 
 | 方法与路径 | 允许调用方与用途 |
 | --- | --- |

@@ -19,9 +19,7 @@ type managedPanel struct {
 	MachineID int64  `json:"machine_id"`
 }
 
-func (a *app) configurationAPI(base string) {
-	a.Mux.HandleFunc("GET "+base+"/configuration", a.pullMachineConfiguration)
-	a.Mux.HandleFunc("POST "+base+"/configuration/status", a.machineConfigurationStatus)
+func (a *app) configurationAPI() {
 	a.Mux.HandleFunc("GET /machine-configurations", a.listMachineConfigurations)
 	a.Mux.HandleFunc("POST /machine-configurations/{id}/retry", a.retryMachineConfiguration)
 }
@@ -74,62 +72,40 @@ func (a *app) configureMachine(w http.ResponseWriter, r *http.Request, machine p
 	}
 }
 
-func (a *app) pullMachineConfiguration(w http.ResponseWriter, r *http.Request) {
-	m, ok := a.machine(w, r)
-	if !ok {
-		return
+func (a *app) pendingMachineConfiguration(machineID string) (p.Record, error) {
+	row, err := a.configuration(machineID)
+	if err != nil || row == nil || p.Text(row, "status") != "pending" {
+		return nil, err
 	}
-	row, e := a.configuration(p.Text(m, "id"))
-	if c.Err(w, e) {
-		return
-	}
-	w.Header().Set("Cache-Control", "no-store")
-	if row == nil || p.Text(row, "status") != "pending" {
-		p.JSON(w, nil)
-		return
-	}
-	p.JSON(w, p.Record{"revision": row["revision"], "config": row["config"]})
+	return p.Record{"revision": row["revision"], "config": row["config"]}, nil
 }
 
-func (a *app) machineConfigurationStatus(w http.ResponseWriter, r *http.Request) {
-	m, ok := a.machine(w, r)
-	if !ok {
-		return
-	}
-	var b struct {
-		Revision float64 `json:"revision"`
-		Status   string  `json:"status"`
-		Message  string  `json:"message"`
-	}
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
+func (a *app) ackMachineConfiguration(w http.ResponseWriter, m p.Record, revision float64, status, message string) {
 	row, e := a.configuration(p.Text(m, "id"))
 	if c.Err(w, e) {
 		return
 	}
-	if row == nil || b.Revision != p.Number(row, "revision") {
+	if row == nil || revision != p.Number(row, "revision") {
 		p.Fail(w, 409, "配置版本已变更")
 		return
 	}
-	if !c.Allowed(b.Status, "applied", "failed") {
+	if !c.Allowed(status, "applied", "failed") {
 		p.Fail(w, 400, "配置状态无效")
 		return
 	}
-	if p.Text(row, "status") != "pending" && p.Text(row, "status") != b.Status {
+	if p.Text(row, "status") != "pending" && p.Text(row, "status") != status {
 		p.Fail(w, 409, "此配置已经处理")
 		return
 	}
 	config, _ := row["config"].(map[string]any)
 	panel, _ := config["panel"].(map[string]any)
-	message := b.Message
 	if key := p.Text(panel, "key"); key != "" {
 		message = strings.ReplaceAll(message, key, "[密钥已隐藏]")
 	}
 	if key := p.Text(m, "key"); key != "" {
 		message = strings.ReplaceAll(message, key, "[密钥已隐藏]")
 	}
-	row["status"], row["message"], row["updatedAt"] = b.Status, message, c.Now()
+	row["status"], row["message"], row["updatedAt"] = status, message, c.Now()
 	if !c.Err(w, a.C.Put(machineConfigurations, row)) {
 		p.JSON(w, true)
 	}

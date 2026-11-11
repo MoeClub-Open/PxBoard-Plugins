@@ -57,6 +57,26 @@ func (a *app) publicCurrency(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	p.JSON(w, currency(config))
 }
+func (a *app) walletGet(w http.ResponseWriter, r *http.Request) {
+	if !c.Member(w, r) {
+		return
+	}
+	balance, err := a.balance(p.Subject(r).ID)
+	if c.Err(w, err) {
+		return
+	}
+	config, err := a.config()
+	if c.Err(w, err) {
+		return
+	}
+	cur := currency(config)
+	w.Header().Set("Cache-Control", "no-store")
+	p.JSON(w, p.Record{
+		"balance":        balance,
+		"currencyName":   cur["currencyName"],
+		"currencySymbol": cur["currencySymbol"],
+	})
+}
 func (a *app) currencyView(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
 		return p.View{}, fmt.Errorf("仅管理员可修改金额单位")

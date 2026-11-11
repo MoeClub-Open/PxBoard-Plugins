@@ -33,7 +33,7 @@ node tools/redeem-migrate/migrate.ts \
 unset PX_REDEEM_ADMIN_TOKEN
 ```
 
-提交从 `/migration/start` 开始，兑换码插件暂停新的兑换和待处理记录发放。工具每批提交 200 条，先写兑换码，再写兑换记录；最后 `/migration/finish` 校验预期数量并恢复兑换。中断后保持暂停，用同一份备份及同一个迁移标识重新执行即可继续。默认标识为 `redeem-separation-v1`，不要为绕过冲突而更换标识。
+提交从 `redeem/migration.start` 开始，兑换码插件暂停新的兑换和待处理记录发放。工具每批提交 200 条，先写兑换码，再写兑换记录；最后 `redeem/migration.finish` 校验预期数量并恢复兑换。中断后保持暂停，用同一份备份及同一个迁移标识重新执行即可继续。默认标识为 `redeem-separation-v1`，不要为绕过冲突而更换标识。
 
 ## 数据对应
 
@@ -55,12 +55,12 @@ unset PX_REDEEM_ADMIN_TOKEN
 
 ## 管理接口
 
-以下路径以 `/api/v1/extensions/redeem` 为前缀，均需要管理员写权限；检查请求中的 `dryRun` 默认为只读。
+以下过程统一通过 `POST /rpc/v1/redeem/{method}` 调用，均需要管理员写权限；检查请求中的 `dryRun` 默认为只读。
 
-| 方法与路径 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `POST /migration/start` | 以 `migrationId/codeCount/claimCount` 建立升级任务并暂停兑换 |
-| `POST /migration/import` | 以相同标识分批检查或写入 `codes`、`claims`；只读检查可提供完整 `codeIds` 引用列表 |
-| `POST /migration/finish` | 核对总数并结束升级 |
+| `migration.start` | 以 `migrationId/codeCount/claimCount` 建立升级任务并暂停兑换 |
+| `migration.import` | 以相同标识分批检查或写入 `codes`、`claims`；只读检查可提供完整 `codeIds` 引用列表 |
+| `migration.finish` | 核对总数并结束升级 |
 
 这是一次性数据升级，不是旧插件接口的兼容层。新页面、接口和功能开关均使用 `redeem` 插件。

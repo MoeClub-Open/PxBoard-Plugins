@@ -62,19 +62,19 @@ node tools/migrate-commerce-affiliate.ts --database /var/lib/pxboard/pxboard.db 
 
 ## 接口
 
-路径前缀为 `/api/v1/extensions/affiliate`，需要登录。
+接口统一通过 `POST /rpc/v1/affiliate/{method}` 调用，需要登录。
 
-| 方法与路径 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET /summary` | 当前用户的邀请人数、佣金汇总和推广链接 |
-| `GET /commissions` | 本人的佣金明细；管理员可查看全部记录 |
-| `GET/POST /withdrawals` | 查看结算记录；`method=wallet` 立即自助转入，`method=cash` 创建提现申请 |
-| `POST /withdrawals/{id}/transfer` | 本人继续旧待转入或处理中的余额结算，返回原结算记录 |
-| `POST /withdrawals/{id}/cancel` | 本人取消尚未执行的待处理记录；转入中及已到账记录不能取消 |
-| `POST /withdrawals/{id}/approve` | 管理员审批现金提现，不用于余额转入 |
-| `POST /withdrawals/{id}/reject` | 管理员拒绝尚未执行的待处理申请，不能拒绝转入中的记录 |
-| `POST /withdrawals/{id}/paid` | 管理员登记现金打款流水 |
-| `GET /settings`、`PATCH /settings` | 管理员读取和修改推广设置 |
-| `GET/POST /profiles`、`PATCH /profiles/{userId}` | 管理员管理个人推广规则 |
+| `summary.get` | 当前用户的邀请人数、佣金汇总和推广链接 |
+| `commissions.list` | 本人的佣金明细；管理员可查看全部记录 |
+| `withdrawals.list` / `withdrawals.create` | 查看结算记录；`method=wallet` 立即自助转入，`method=cash` 创建提现申请 |
+| `withdrawals.transfer`（含 `id`） | 本人继续旧待转入或处理中的余额结算，返回原结算记录 |
+| `withdrawals.cancel`（含 `id`） | 本人取消尚未执行的待处理记录；转入中及已到账记录不能取消 |
+| `withdrawals.approve`（含 `id`） | 管理员审批现金提现，不用于余额转入 |
+| `withdrawals.reject`（含 `id`） | 管理员拒绝尚未执行的待处理申请，不能拒绝转入中的记录 |
+| `withdrawals.paid`（含 `id`） | 管理员登记现金打款流水 |
+| `settings.list` / `settings.update` | 管理员读取和修改推广设置 |
+| `profiles.list` / `profiles.create` / `profiles.update` | 管理员管理个人推广规则（更新时 `id` 为 `userId`） |
 
 金额均为整数分；现金收款账户和打款流水仅向有权限的用户提供。普通用户不能修改他人的推广资料或审批现金提现。余额转入成功状态为 `approved`，处理中为 `approving`；现金申请状态为 `pending`，审批后为 `approved`，打款登记后为 `paid`。

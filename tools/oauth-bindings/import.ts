@@ -21,7 +21,7 @@ if (panel.protocol !== 'https:' && !(panel.protocol === 'http:' && ['localhost',
 }
 const bindings: unknown = JSON.parse(await readFile(values.input, 'utf8'))
 if (!Array.isArray(bindings)) throw new Error('输入需为登录绑定 JSON 数组')
-const response = await fetch(new URL('/api/v1/extensions/oauth/bindings/import', panel), {
+const response = await fetch(new URL('/rpc/v1/oauth/bindings.import', panel), {
   method: 'POST',
   headers: {
     Authorization: `Bearer ${process.env.PX_OAUTH_ADMIN_TOKEN}`,

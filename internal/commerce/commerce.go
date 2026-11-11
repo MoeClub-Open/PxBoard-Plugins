@@ -112,6 +112,7 @@ func New() http.Handler {
 	a.Mux.HandleFunc("POST /orders/{id}/{action}", a.orderAction)
 	a.Mux.HandleFunc("GET /ledger", a.ledger)
 	a.Mux.HandleFunc("POST /ledger", a.adjust)
+	a.RPC("wallet.get", a.walletGet)
 	a.Mux.HandleFunc("GET /internal/orders/{id}", a.internalOrder)
 	a.Mux.HandleFunc("GET /internal/orders", a.internalOrders)
 	a.Mux.HandleFunc("GET /internal/purchase-history/{userId}", a.internalPurchaseHistory)

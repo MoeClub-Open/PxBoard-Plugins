@@ -93,23 +93,23 @@ unset PX_OAUTH_ADMIN_TOKEN
 
 ## 接口
 
-以下路径以 `/api/v1/extensions/oauth` 为前缀。成功返回 `{"data":...}`。
+除外部身份提供方浏览器重定向固定回调 `GET /api/v1/extensions/oauth/callback/{provider}` 外，业务接口统一通过 `POST /rpc/v1/oauth/{method}` 调用，成功返回 `{"data":...}`。
 
-| 方法与路径 | 权限及用途 |
+| 过程 / 回调 | 权限及用途 |
 | --- | --- |
-| `GET /providers` | 公开的已启用服务名称、类型；`allowRegistration` 反映服务开关与全局注册政策的组合结果 |
-| `POST /authorize` | 发起登录；`purpose=bind` 时需要用户会话；参数为 `providerId/purpose/proof/redirectPath`，可选 `referral` |
-| `GET /callback/{provider}` | 提供方回调，仅处理服务端已保存的一次性授权状态 |
-| `POST /complete-binding` | 当前用户以 `ticket/proof` 确认绑定 |
-| `POST /registration` | 以待注册 `ticket/proof` 查询服务名称与到期时间，不返回提供方邮箱 |
-| `POST /complete-registration` | 以 `ticket/proof/email/password` 完成新账号注册，返回核心登录凭证 |
-| `GET /bindings` | 当前用户的绑定列表，含 `requiresPassword` |
-| `DELETE /bindings/{id}` | 解除自己的绑定；最后一条需要请求体 `password/code` |
-| `GET/POST /settings/providers` | 管理员查询或创建服务配置 |
-| `PATCH/DELETE /settings/providers/{id}` | 管理员编辑或删除未使用的配置 |
-| `POST /bindings/import` | 管理员人工搬入绑定；`dryRun` 默认 `true`，`bindings` 为上述数组 |
-| `GET /internal/registrations` | 管理员或推广插件读取本插件创建的新账号来源，仅返回 `userId/referral/registeredAt`，不返回第三方账号标识 |
+| `providers.list` | 公开的已启用服务名称、类型；`allowRegistration` 反映服务开关与全局注册政策的组合结果 |
+| `authorize` | 发起登录；`purpose=bind` 时需要用户会话；参数为 `providerId/purpose/proof/redirectPath`，可选 `referral` |
+| `GET /api/v1/extensions/oauth/callback/{provider}` | 外部提供方浏览器回调，仅处理服务端已保存的一次性授权状态 |
+| `completeBinding` | 当前用户以 `ticket/proof` 确认绑定 |
+| `registration` | 以待注册 `ticket/proof` 查询服务名称与到期时间，不返回提供方邮箱 |
+| `completeRegistration` | 以 `ticket/proof/email/password` 完成新账号注册，返回核心登录凭证 |
+| `bindings.list` | 当前用户的绑定列表，含 `requiresPassword` |
+| `bindings.delete` | 解除自己的绑定（含 `id`）；最后一条需要请求体 `password/code` |
+| `settings.providers.list` / `settings.providers.create` | 管理员查询或创建服务配置 |
+| `settings.providers.update` / `settings.providers.delete` | 管理员按 `id` 编辑或删除未使用的配置 |
+| `bindings.import` | 管理员人工搬入绑定；`dryRun` 默认 `true`，`bindings` 为上述数组 |
+| 内部 `GET /internal/registrations` | 推广插件经核心运行时通道读取本插件创建的新账号来源，仅返回 `userId/referral/registeredAt` |
 
-最终登录由核心 `POST /api/v1/auth/external/complete` 完成；该接口不是插件自行设置会话。插件的 `auth:login` 权限允许申请登录凭证，应仅授予可信插件。数据目录包含服务端密钥和登录绑定，备份与恢复时按面板敏感数据管理。
+最终登录由核心 `POST /rpc/v1/core/auth.externalComplete` 完成；该过程不是插件自行设置会话。插件的 `auth:login` 权限允许申请登录凭证，应仅授予可信插件。数据目录包含服务端密钥和登录绑定，备份与恢复时按面板敏感数据管理。
 
 本插件只读调用注册插件的 `GET /internal/policy` 获取注册开关，不向注册插件写入用户绑定。`call:registration` 是可选跨插件调用权限，不会自动安装注册插件；`emit:account.registered` 用于发布本插件实际创建的新用户事件，`system.tick` 仅接受核心来源，用于重试尚未成功投递的记录。

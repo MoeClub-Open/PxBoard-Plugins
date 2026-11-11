@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: MoeClub-Open/PxBoard
-          ref: 23e583e7ef026dccdf3f7f0d3edb5ad91fc7799b
+          ref: 24242683d015a99b50fbf4b3039fa91ff9ca95cd
           path: PxBoard
           persist-credentials: false
       - uses: actions/setup-go@v7
@@ -31,7 +31,7 @@ jobs:
         run: go build ./...
       - name: Verify Flux nodes and subscription capability
         working-directory: PxBoard-Plugins
-        run: go test ./internal/nodes ./internal/subscriptions
+        run: go test ./...
       - name: Package Flux plugins for ARM64 nodes
         working-directory: PxBoard-Plugins
         env:

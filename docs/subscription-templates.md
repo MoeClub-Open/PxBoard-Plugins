@@ -55,7 +55,7 @@ rules:
 
 转换将旧自动填充分组改为显式节点占位符，并转换常见正则；sing-box 的旧 DNS 地址、`block` / `dns` 特殊出站和入站嗅探字段分别转成当前 DNS、路由 action 及域名解析器配置。不能转换或校验未通过的模板保留为停用草稿，并保存原因；只有有效模板会被选择为默认，其余格式使用内置模板。模板问题不阻断用户和套餐迁移。目标已有同名配置时不覆盖。
 
-已经完成用户迁移的站点可以通过管理员接口单独搬入模板，不重新导入用户。`POST /api/v1/extensions/subscriptions/templates/import-xboard` 接收：
+已经完成用户迁移的站点可以通过管理员接口单独搬入模板，不重新导入用户。`POST /rpc/v1/subscriptions/templates.importXboard` 接收：
 
 ```json
 {"sourceId":"old-site","activate":false,"templates":[{"name":"clashmeta","content":"原 YAML 文本"},{"name":"singbox","content":"原 JSON 文本"}]}
@@ -65,17 +65,16 @@ rules:
 
 ## 接口
 
-接口均相对 `/api/v1/extensions/subscriptions`，需要管理员：
+接口均通过 `POST /rpc/v1/subscriptions/{method}` 调用，需要管理员：
 
-| 接口 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET/POST /templates` | 列表和新建 |
-| `PATCH/DELETE /templates/{id}` | 编辑和删除 |
-| `GET /templates/options?format=clash` | 默认模板选择项 |
-| `POST /templates/{id}/preview` | 示例节点预览 |
-| `POST /templates/{id}/validate` | 语法和引用校验 |
-| `POST /templates/{id}/default` | 设为该格式默认 |
-| `POST /templates/{id}/reset` | 恢复内置内容 |
-| `POST /templates/preview` | 提交 `format`、`content` 预览未保存内容 |
-| `GET/PATCH /template-settings` | 默认模板和客户端信息 |
-| `POST /templates/import-xboard` | 单独导入旧模板 |
+| `templates.list` / `templates.create` | 列表和新建 |
+| `templates.update` / `templates.delete`（含 `id`） | 编辑和删除 |
+| `templates.options`（含 `format`） | 默认模板选择项 |
+| `templates.preview`（含 `id`，或提交 `format` 与 `content`） | 示例节点预览已保存或未保存模板 |
+| `templates.validate`（含 `id`） | 语法和引用校验 |
+| `templates.default`（含 `id`） | 设为该格式默认 |
+| `templates.reset`（含 `id`） | 恢复内置内容 |
+| `templateSettings.list` / `templateSettings.update` | 默认模板和客户端信息 |
+| `templates.importXboard` | 单独导入旧模板 |

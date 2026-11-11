@@ -31,16 +31,16 @@
 
 邮件进入队列时确定模板和内容，修改模板只影响此后生成的邮件。重试继续使用原有内容和 Message-ID，避免同一通知因模板修改而改变。HTML 邮件使用标准 `multipart/alternative`，保留纯文本版本；UTF-8 内容使用 quoted-printable 编码。
 
-管理员接口均相对 `/api/v1/extensions/notifications`：
+管理员接口统一通过 `POST /rpc/v1/notifications/{method}` 调用：
 
-| 接口 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET/PATCH /mail` | SMTP 单例配置；GET 返回隐藏密码的单条记录数组 |
-| `GET /templates` | 模板元信息列表 |
-| `GET/PATCH /templates/{id}` | 读取或保存 `subject/text/html`，读取附带变量定义 |
-| `POST /templates/{id}/preview` | 预览提交的内容，返回 `subject/text/html` |
-| `POST /templates/{id}/reset` | 删除覆盖配置并恢复内置内容 |
-| `GET /notifications?limit=12&offset=0&status=failed&q=...` | 按页读取投递记录和总数 |
+| `mail.list` / `mail.update` | SMTP 单例配置；读取时返回隐藏密码的单条记录数组 |
+| `templates.list` | 模板元信息列表 |
+| `templates.get` / `templates.update`（含 `id`） | 读取或保存 `subject/text/html`，读取附带变量定义 |
+| `templates.preview`（含 `id`） | 预览提交的内容，返回 `subject/text/html` |
+| `templates.reset`（含 `id`） | 删除覆盖配置并恢复内置内容 |
+| `notifications.list` / `notifications.retry` | 按页读取投递记录（`limit/offset/status/q`）或按 `id` 手动重试 |
 
 ## 从旧用户服务升级
 
@@ -71,7 +71,7 @@ pxboard -data /数据目录 -enable-plugin notifications
 
 后台每次给每个任务加入最多 100 封，任务进度和新邮件在同一事务中保存。稳定的任务与用户标识防止重启、重复调度造成重复入队。发送上限在 SMTP 配置中设置，默认每分钟 60 封，同一队列的业务通知也受上限约束。失败仍按邮件队列规则重试，列表分别显示发送、等待、失败和跳过数量。最终失败记录可单独重试。
 
-管理员接口：`GET/POST /campaigns`、`GET/PATCH /campaigns/{id}`；`POST /campaigns/{id}/preview` 返回人数、前 20 个邮箱和示例邮件；`POST /campaigns/{id}/start` 接收预览人数 `total`；操作 `pause/resume/cancel` 均使用 POST。草稿字段为 `subject/body/audience/emails/search`，`audience` 为 `all` 或 `selected`。无论预览或草稿都不会自动开始发送。
+管理员接口：`campaigns.list`、`campaigns.create`、`campaigns.get`、`campaigns.update`；`campaigns.preview` 返回人数、前 20 个邮箱和示例邮件；`campaigns.start` 接收 `id` 与预览人数 `total`；操作 `campaigns.pause`、`campaigns.resume`、`campaigns.cancel` 传入 `id`。草稿字段为 `subject/body/audience/emails/search`，`audience` 为 `all` 或 `selected`。无论预览或草稿都不会自动开始发送。
 
 ## 到期与流量提醒
 

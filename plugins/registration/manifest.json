@@ -19,14 +19,15 @@
   "capabilities": [
     "auth.registration"
   ],
-  "publicPaths": [
-    "/register"
+  "publicProcedures": [
+    "register"
   ],
   "auth": [
     {
       "key": "register",
       "title": "注册",
-      "path": "/register",
+      "procedure": "register",
+      "path": "registration/register",
       "capability": "auth.registration",
       "query": {
         "referral": "ref"

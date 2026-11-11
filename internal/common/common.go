@@ -12,10 +12,15 @@ import (
 type App struct {
 	C          *p.Client
 	Mux        *http.ServeMux
+	RPCs       map[string]http.HandlerFunc
 	Concurrent []string
 }
 
 func (a *App) ConcurrentPaths() []string { return a.Concurrent }
+
+func (a *App) RPC(method string, fn http.HandlerFunc) {
+	a.RPCs[p.NormalizeProcedure(method)] = fn
+}
 
 func (a *App) Summary(fn func(*http.Request) ([]p.Metric, error)) {
 	a.Mux.HandleFunc("GET /summary", func(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +34,13 @@ func (a *App) Summary(fn func(*http.Request) ([]p.Metric, error)) {
 	})
 }
 
-func New() *App                                                 { return &App{C: p.NewClient(), Mux: http.NewServeMux()} }
+func New() *App {
+	a := &App{C: p.NewClient(), Mux: http.NewServeMux(), RPCs: map[string]http.HandlerFunc{}}
+	a.Mux.HandleFunc("POST /_rpc/{method...}", func(w http.ResponseWriter, r *http.Request) {
+		p.ServeRPC(a.Mux, a.RPCs, w, r)
+	})
+	return a
+}
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) { a.Mux.ServeHTTP(w, r) }
 func Err(w http.ResponseWriter, e error) bool {
 	if e != nil {
@@ -52,7 +63,7 @@ func Require(w http.ResponseWriter, r *http.Request, services ...string) bool {
 }
 func Member(w http.ResponseWriter, r *http.Request) bool {
 	a := p.Subject(r)
-	if a.ID == "" || a.Role == "guest" {
+	if a.ID == "" || (a.Role != "admin" && a.Role != "member") {
 		p.Fail(w, 401, "请先登录")
 		return false
 	}
@@ -202,7 +213,7 @@ func Field(key, label, kind string, required bool) p.Field {
 	return p.Field{Key: key, Label: label, Type: kind, Required: required}
 }
 func GroupField(key, label string, required bool) p.Field {
-	return p.Field{Key: key, Label: label, Type: "groups", Required: required, OptionsEndpoint: "/api/v1/extensions/nodes/groups/options"}
+	return p.Field{Key: key, Label: label, Type: "groups", Required: required, OptionsEndpoint: "nodes/groups.options"}
 }
 func Select(key, label string, options ...string) p.Field {
 	f := Field(key, label, "select", true)
@@ -217,7 +228,7 @@ func Select(key, label string, options ...string) p.Field {
 	return f
 }
 func UserField() p.Field {
-	return p.Field{Key: "userId", Label: "用户", Type: "select", Required: true, OptionsEndpoint: "/api/v1/users/options", OptionsSearch: true}
+	return p.Field{Key: "userId", Label: "用户", Type: "select", Required: true, OptionsEndpoint: "core/users.options", OptionsSearch: true}
 }
 
 func (a *App) UsersFor(rows []p.Record, field string) ([]p.Record, error) {

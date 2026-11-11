@@ -17,7 +17,7 @@ import (
 
 const maxImageSize = 2 << 20
 
-var attachmentPattern = regexp.MustCompile(`/api/v1/extensions/support/attachments/([a-f0-9]{32})`)
+var attachmentPattern = regexp.MustCompile(`(?:/files/support/attachments/|/api/v1/extensions/support/attachments/)([a-f0-9]{32})`)
 var attachmentID = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 func (a *app) attachment(id string) (p.Record, error) {
@@ -115,27 +115,26 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 		p.Fail(w, 500, "图片保存失败")
 		return
 	}
-	p.JSON(w, p.Record{"id": id, "url": "/api/v1/extensions/support/attachments/" + id})
+	p.JSON(w, p.Record{"id": id, "url": "/files/support/attachments/" + id})
 }
-func (a *app) download(w http.ResponseWriter, r *http.Request) {
+func (a *app) readAuthorizedAttachment(w http.ResponseWriter, r *http.Request, id string) (p.Record, []byte, bool) {
 	if !c.Member(w, r) {
-		return
+		return nil, nil, false
 	}
-	id := r.PathValue("id")
 	if !attachmentID.MatchString(id) {
 		p.Fail(w, 404, "图片不存在")
-		return
+		return nil, nil, false
 	}
 	row, err := a.attachment(id)
 	if err != nil {
 		p.Fail(w, 404, "图片不存在")
-		return
+		return nil, nil, false
 	}
 	allowed := p.Admin(r) || p.Text(row, "userId") == p.Subject(r).ID
 	if !allowed {
 		tickets, err := a.Filter("tickets", func(ticket p.Record) bool { return p.Text(ticket, "userId") == p.Subject(r).ID })
 		if c.Err(w, err) {
-			return
+			return nil, nil, false
 		}
 		for _, ticket := range tickets {
 			if messageAttachmentIDs(ticket, id) {
@@ -146,12 +145,19 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 	}
 	if !allowed {
 		p.Fail(w, 403, "无权查看此图片")
-		return
+		return nil, nil, false
 	}
 	path := filepath.Join(os.Getenv("PX_PLUGIN_STATE_DIR"), "attachments", id)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		p.Fail(w, 404, "图片不存在")
+		return nil, nil, false
+	}
+	return row, data, true
+}
+func (a *app) download(w http.ResponseWriter, r *http.Request) {
+	row, data, ok := a.readAuthorizedAttachment(w, r, r.PathValue("id"))
+	if !ok {
 		return
 	}
 	w.Header().Set("Content-Type", p.Text(row, "contentType"))
@@ -159,6 +165,25 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(data)
+}
+func (a *app) attachmentRPC(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		ID string `json:"id"`
+	}
+	if c.Err(w, p.Decode(r, &b)) {
+		return
+	}
+	row, data, ok := a.readAuthorizedAttachment(w, r, strings.TrimSpace(b.ID))
+	if !ok {
+		return
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	p.JSON(w, p.Record{
+		"id":          row["id"],
+		"contentType": p.Text(row, "contentType"),
+		"size":        len(data),
+		"data":        base64.StdEncoding.EncodeToString(data),
+	})
 }
 func message(r *http.Request, content string, ids []string) p.Record {
 	return p.Record{"id": p.ID(), "userId": p.Subject(r).ID, "author": p.Subject(r).Email, "admin": p.Admin(r), "createdAt": c.Now(), "content": strings.TrimSpace(content), "attachmentIds": ids}

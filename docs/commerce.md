@@ -38,14 +38,14 @@
 
 套餐、价格、周期和流量额度仅向已登录用户提供，公开首页、公开站点快照和搜索内容不包含这些数据，不再提供匿名套餐目录。
 
-`GET /plans?scope=mine` 按当前用户资格返回可购买或续费的套餐与周期。管理员在用户前台预览时同样使用此参数；后台 `GET /plans` 用于管理全部套餐。创建订单也要求登录，价格以服务端报价及订单快照为准。
+`POST /rpc/v1/commerce/plans.list` 传入 `{"scope":"mine"}` 按当前用户资格返回可购买或续费的套餐与周期；管理员在用户前台预览时同样使用此参数，后台不传 `scope` 管理全部套餐。创建订单前可通过 `commerce/orders.quote` 报价，价格以服务端报价及订单快照为准。
 
 ## 创建与支付订单
 
 普通用户只为自己下单；管理员可以明确填写 `userId` 代建订单。
 
 ```http
-POST /api/v1/extensions/commerce/orders
+POST /rpc/v1/commerce/orders.create
 Content-Type: application/json
 
 {
@@ -74,17 +74,19 @@ Content-Type: application/json
 
 取消保留订单记录，写入 `canceledAt` 和 `cancelReason`（`timeout` 或 `manual`）。待支付订单响应中的 `expiresAt` 是按当前设置计算的支付截止时间，付款弹窗会显示该时间。
 
-后台支持按状态、类型、支付方式、用户、创建时间和取消原因组合筛选，筛选与分页、总数、关键词搜索在服务端一起执行。管理员还可按用户邮箱或姓名搜索。`GET /orders` 接受 `status`、`kind`、`method`、`cancelReason`、管理员专用 `userId`，以及 RFC3339 格式的 `createdAtFrom` / `createdAtTo`；时间范围包含两端。普通用户的筛选始终保留自身归属条件。
+后台支持按状态、类型、支付方式、用户、创建时间和取消原因组合筛选，筛选与分页、总数、关键词搜索在服务端一起执行。管理员还可按用户邮箱或姓名搜索。`commerce/orders.list` 接受 `status`、`kind`、`method`、`cancelReason`、管理员专用 `userId`，以及 RFC3339 格式的 `createdAtFrom` / `createdAtTo`；时间范围包含两端。普通用户的筛选始终保留自身归属条件。
 
-| 接口 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET /orders` | 当前用户的订单；管理员可查看全站订单 |
-| `GET/PATCH /order-settings` | 管理员读取或调整待支付有效期，正文为 `{"paymentTimeoutMinutes":30}` |
-| `POST /orders/{id}/pay` | 使用余额支付套餐订单 |
-| `POST /orders/{id}/cancel` | 取消待支付订单 |
-| `POST /orders/{id}/confirm` | 管理员确认已人工收款 |
-| `POST /orders/{id}/refund` | 管理员将已完成套餐订单退回余额并撤回可撤回权益 |
-| `POST /api/v1/extensions/payments/checkout` | 在线渠道创建收银台，提交 `orderId` 与 `channelId` |
+| `commerce/orders.list` | 当前用户的订单；管理员可查看全站订单 |
+| `commerce/wallet.get` | 当前用户的余额与站点货币单位 |
+| `commerce/ledger.list` / `commerce/ledger.create` | 读取余额账本或管理员调整余额 |
+| `commerce/orderSettings.list` / `commerce/orderSettings.update` | 管理员读取或调整待支付有效期，正文为 `{"paymentTimeoutMinutes":30}` |
+| `commerce/orders.pay`（含 `id`） | 使用余额支付套餐订单 |
+| `commerce/orders.cancel`（含 `id`） | 取消待支付订单 |
+| `commerce/orders.confirm`（含 `id`） | 管理员确认已人工收款 |
+| `commerce/orders.refund`（含 `id`） | 管理员将已完成套餐订单退回余额并撤回可撤回权益 |
+| `payments/channels.list` / `payments/checkout` | 读取可用支付渠道或创建收银台（提交 `orderId` 与 `channelId`） |
 
 充值需要在线渠道或管理员明确调整余额，不能用余额给余额充值。成功支付后依次写入已支付状态、开通权益并完成订单；中途失败会通过任务重试，权益和账本按业务标识避免重复写入。
 
@@ -112,7 +114,7 @@ Content-Type: application/json
 | `GET /internal/purchase-history/{userId}` | 仅 `affiliate` 查询迁入订单归档之前的购买事实；不把当前新订单计入该标记 |
 | `GET /internal/orders/{id}` | `payments`、`affiliate` 核对订单状态 |
 
-路径以 `/api/v1/extensions/commerce` 为前缀。内部钱包请求为 `{userId, amount, operationId, reason}`，`amount` 为正整数分。相同来源插件与 `operationId` 重试同一用户、金额时不重复入账；变更用户或金额返回冲突。普通用户不能调用，管理员调整余额仍使用原余额账本操作。
+内部接口经本机运行时通道 `/api/v1/runtime/call/commerce/...` 调用。内部钱包请求为 `{userId, amount, operationId, reason}`，`amount` 为正整数分。相同来源插件与 `operationId` 重试同一用户、金额时不重复入账；变更用户或金额返回冲突。普通用户不能调用，管理员调整余额仍使用 `commerce/ledger.create`。
 
 商业插件发布 `order.fulfilled` 和 `order.refunded`。接收者须核对事件来源 `commerce`，并按 `orderId` 去重。开通事件包含 `userId/amount/planName/kind/paidAt/fulfilledAt`，退款事件包含 `userId/amount/refundedAt`。通知发布失败会继续重试，不会重新扣款或重复发放访问权益。
 

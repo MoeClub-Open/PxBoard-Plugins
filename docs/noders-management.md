@@ -1,6 +1,6 @@
 # NodeRS 配置管理与面板迁移
 
-节点插件支持 NodeRS 本地面板配置的下发与结果记录。使用原仓库的 [NodeRS v0.1.49 或更新版本](https://github.com/MoeclubM/NodeRS/releases)，同一安装包包含 Xboard、PxBoard 与 `managedConfiguration` 支持；此前安装组织适配版的节点，按 [发布源切换说明](https://github.com/MoeclubM/NodeRS/blob/main/docs/zh/install.md#从组织适配版升级) 完成一次升级。旧版 NodeRS 不会读取配置任务，任务会保持等待状态。节点的协议、监听、证书和用户配置仍通过原有节点接口更新。
+节点插件支持 NodeRS 本地面板配置的下发与结果记录。使用原仓库的 [NodeRS v0.1.50 或更新版本](https://github.com/MoeclubM/NodeRS/releases)，同一安装包包含 Xboard、PxBoard 统一 `/rpc/v1` 接口与 `managedConfiguration` 支持；此前安装组织适配版的节点，按 [发布源切换说明](https://github.com/MoeclubM/NodeRS/blob/main/docs/zh/install.md#从组织适配版升级) 完成一次升级。旧版 NodeRS 不会读取配置任务，任务会保持等待状态。
 
 ## 创建 NodeRS 节点
 
@@ -24,7 +24,7 @@ Mieru 可选择 TCP 或 UDP，不需要 TLS 证书。修改传输方式时会同
 
 节点编辑中的“在订阅中显示”和“启用独立服务”分别控制发布与运行。关闭订阅显示不会停止已经运行的节点；停用独立服务不会启动另一份监听。已有的共用节点关系保留：可见的子节点使用主节点的服务，子节点自身不单独启动，避免重复监听。节点列表只显示主节点，点击“连接地址”可查看或修改它的附加地址；订阅会为每个可见地址生成独立入口，并使用主节点的协议与认证配置；地址的分组仍须同时满足主节点和地址自身的访问条件。
 
-管理员接口以 `/api/v1/extensions/nodes` 为前缀：`GET /settings` 返回单行设置列表，`PATCH /settings` 接收 `{"userStatusEnabled":false}`，管理表单直接保存到同一路径。普通用户不能读取或修改设置。`GET /_capabilities` 仅允许核心内部调用，返回 `{"data":{"portal.status":true}}` 或对应的 `false`，供核心控制页面入口；业务接口仍会独立检查开关。
+管理员接口统一通过 `POST /rpc/v1/nodes/{method}` 调用：`settings.list` 返回单行设置列表，`settings.update` 接收 `{"userStatusEnabled":false}`。普通用户不能读取或修改设置，前台监控读取 `nodes/status.list` 与 `nodes/status.display`。`/_capabilities` 仅允许核心运行时内部调用，返回 `{"data":{"portal.status":true}}` 或对应的 `false`，供核心控制页面入口；业务接口仍会独立检查开关。
 
 ## 在后台迁移
 
@@ -44,18 +44,19 @@ Mieru 可选择 TCP 或 UDP，不需要 TLS 证书。修改传输方式时会同
 
 ## 管理接口
 
-路径前缀为 `/api/v1/extensions/nodes`，需要管理员会话或具有写入权限的管理员访问密钥。`{id}` 是机器记录 ID，区别于用于 NodeRS 认证的数字机器编号。
+过程统一通过 `POST /rpc/v1/nodes/{method}` 调用，需要管理员会话或具有写入权限的管理员访问密钥。请求中的 `id` 是机器或任务记录 ID，区别于用于 NodeRS 认证的数字机器编号。
 
-| 方法与路径 | 内容 |
+| 过程与参数 | 内容 |
 | --- | --- |
-| `POST /machines/{id}/configuration` | 下发目标面板配置 |
-| `GET /machine-configurations` | 每台机器最近一次任务的版本、目标和处理结果；不返回密钥 |
-| `POST /machine-configurations/{id}/retry` | 重新下发失败任务 |
+| `machines.configuration`（含 `id`） | 下发目标面板配置 |
+| `machineConfigurations.list` | 每台机器最近一次任务的版本、目标和处理结果；不返回密钥 |
+| `machineConfigurations.retry`（含 `id`） | 重新下发失败任务 |
 
 下发请求：
 
 ```json
 {
+  "id": "机器记录ID",
   "panelType": "pxboard",
   "api": "https://panel.example.com",
   "machineId": 42,
@@ -67,32 +68,33 @@ Mieru 可选择 TCP 或 UDP，不需要 TLS 证书。修改传输方式时会同
 
 ## NodeRS 接口
 
-以下接口使用数字机器编号，沿用 `X-Machine-Key` 认证。停用的机器不能读取任务或回报结果。握手的 `capabilities` 包含 `managedConfiguration`。
+节点端与管理端、客户端共用同一套 `/rpc/v1` 协议，路径为 `POST /rpc/v1/nodes/{method}`，请求头使用 `Authorization: Bearer pxm_<machineId>.<key>`（也兼容直接传 `<key>` 并在请求体附带 `machineId`）。机器凭证角色仅允许调用 `nodes` 服务的 `server.*` 过程；停用的机器不能读取任务或回报结果。
 
-| 方法与路径 | 内容 |
+| 过程 | 内容 |
 | --- | --- |
-| `GET /machines/{machineId}/configuration` | 获取待处理任务；没有任务或已经处理时 `data` 为 `null` |
-| `POST /machines/{machineId}/configuration/status` | 确认成功或失败 |
+| `server.bootstrap` | 机器握手，返回 `machineId`、名称、`pullIntervalSeconds`、`pushIntervalSeconds` 与 `capabilities` |
+| `server.pull` | 合并拉取整机快照（传入 `knownRevision`），一次返回 `revision`、`unchanged`、全部节点 `config` 与 `users`、轮询间隔，以及待处理的 `managedConfiguration` |
+| `server.traffic` | 上报单节点（`nodeId/batchId/accounts`）或多节点（`reports`）增量流量批次 |
+| `server.telemetry` | 上报主机监控状态 `status` 及单节点或多节点在线账户列表 |
+| `server.ackConfig` | 确认 `managedConfiguration` 应用成功（`applied`）或失败（`failed`） |
 
-待处理任务响应：
+`server.pull` 中的 `managedConfiguration` 字段结构：
 
 ```json
 {
-  "data": {
-    "revision": 1,
-    "config": {
-      "panel": {
-        "type": "pxboard",
-        "api": "https://target.example.com",
-        "key": "目标机器密钥",
-        "machine_id": 42
-      }
+  "revision": 1,
+  "config": {
+    "panel": {
+      "type": "pxboard",
+      "api": "https://target.example.com",
+      "key": "目标机器密钥",
+      "machine_id": 42
     }
   }
 }
 ```
 
-状态请求为 `{"revision":1,"status":"applied","message":"..."}`，失败使用 `failed`。状态向原面板回报，使用原机器密钥；版本不匹配返回 409。重复确认同一终态可以安全重试，已经成功的任务不能被后续失败回报改写。任务只下发给所属机器，目标密钥不出现在管理列表或处理结果中。
+`server.ackConfig` 请求为 `{"machineId":42,"revision":1,"status":"applied","message":"..."}`，失败使用 `failed`。状态向原面板回报，使用原机器密钥；版本不匹配返回 409。重复确认同一终态可以安全重试，已经成功的任务不能被后续失败回报改写。任务只下发给所属机器，目标密钥不出现在管理列表或处理结果中。
 
 ## 从 Xboard 迁移
 

@@ -12,13 +12,13 @@
 
 订阅验证默认关闭，可复用独立人机验证插件；启用后需要为每条链接单独验证，详情见[人机验证](captcha.md)。未验证的链接不显示地址，服务端也拒绝拉取；验证通过后客户端不需要每次更新都验证。
 
-接口：`GET /api/v1/extensions/subscriptions/links?mine=1` 列出自己的链接；`POST /links` 可提交 `name` 和 `bindUserAgent`，只返回记录 ID；`POST /links/{id}/rotate` 重置，`DELETE /links/{id}` 删除。访问其他用户的链接需要管理员权限。
+接口统一通过 `POST /rpc/v1/subscriptions/{method}` 调用：`links.list`（传入 `{"mine":true}`）列出自己的链接；`links.create` 提交 `name` 和 `bindUserAgent`，只返回记录 ID；`links.rotate` 与 `links.delete` 传入 `{"id":"..."}` 执行重置或删除。访问其他用户的链接需要管理员权限。第三方客户端拉取订阅继续使用 `GET /s/{token}`（同时保留 `/api/v1/extensions/subscriptions/s/{token}`）。
 
 ## 已登录客户端
 
-原生客户端可使用核心会话直接请求 `GET /api/v1/extensions/subscriptions/configuration`，支持 `format=aerion`、`clash`、`sing-box`、`uri`。节点与分流规则统一从所选配置格式读取。接口要求登录，始终只返回当前账号有权使用的节点；管理员也不能通过该接口下载其他用户配置。
+Web 前台与原生客户端统一使用核心会话调用 `POST /rpc/v1/subscriptions/client.profile`（也可放入 `POST /rpc/v1/$batch` 与账户、插件、钱包信息合并请求）。传入可选 `knownRevision` 时，配置未变化直接返回 `unchanged: true`；完整响应包含 `revision`、`blockReason`（`""`、`no_plan`、`expired`、`traffic_exceeded`、`suspended`）、`account`、`nodes`、`routing`、`links` 与 `settings`。接口要求登录，始终返回 HTTP 200 且只包含当前账号有权使用的节点；即使套餐到期或暂无节点，账户资料与权益状态也会正常返回。
 
-它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录及一次性打开用户前台的协议见主项目 `docs/native-clients.md`。Mihomo 配置保留当前生效模板与分流，Aerion 节点列表复用同一协议转换，避免 Mieru 经过 sing-box 时被省略。
+它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录协议见主项目 `docs/native-clients.md`。Aerion 输出在保留生效 Mihomo 分流与协议转换的同时，会自动移除二进制 `.mrs` 等外部 `rule-providers` 并清理悬空 `RULE-SET` 引用（将 `cn-domain` 规则集转换为内置 `DOMAIN-SUFFIX,cn` 规则），避免原生客户端同步中断。
 
 ## Aerion 与 Mihomo 分离
 

@@ -20,11 +20,13 @@
     "system.tick"
   ],
   "publicPaths": [
-    "/providers",
-    "/authorize",
-    "/callback",
-    "/registration",
-    "/complete-registration"
+    "/callback"
+  ],
+  "publicProcedures": [
+    "providers.list",
+    "authorize",
+    "registration",
+    "completeRegistration"
   ],
   "pages": [
     {

@@ -3,6 +3,9 @@
   "publicPaths": [
     "/s"
   ],
+  "publicProcedures": [
+    "settings.public"
+  ],
   "apiVersion": "1.0",
   "name": "订阅与客户端",
   "permissions": [

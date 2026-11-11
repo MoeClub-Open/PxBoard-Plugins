@@ -47,13 +47,6 @@ func (a *app) export(w http.ResponseWriter, r *http.Request) {
 	a.exportAccount(w, r, link, client, major)
 }
 
-func (a *app) configuration(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	if c.Member(w, r) {
-		a.exportAccount(w, r, p.Record{"userId": p.Subject(r).ID}, "", "")
-	}
-}
-
 func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Record, client, major string) {
 	var clients, nodes []p.Record
 	if c.Err(w, a.C.Call("access", "GET", "/internal/clients?userId="+url.QueryEscape(p.Text(link, "userId")), nil, &clients)) {
@@ -163,6 +156,9 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 			return
 		}
 		data, err = sc.Render(templateFormat, p.Text(template, "content"), generated, title, hosts)
+		if err == nil && format == "aerion" {
+			data, _, err = sanitizeAerionYAML(data)
+		}
 		if templateFormat == "clash" {
 			contentType = "text/yaml; charset=utf-8"
 		} else {

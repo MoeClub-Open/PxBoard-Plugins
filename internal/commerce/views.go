@@ -12,7 +12,7 @@ func planResource() p.Resource {
 		c.Field("name", "套餐名称", "text", true),
 		{Key: "quotaGiB", Label: "每周期流量（GB）", Type: "number", Default: 100},
 		c.Field("unlimited", "不限流量", "boolean", false),
-		{Key: "groups", Label: "可用节点分组", Type: "groups", Required: true, Default: "default", OptionsEndpoint: "/api/v1/extensions/nodes/groups/options"},
+		{Key: "groups", Label: "可用节点分组", Type: "groups", Required: true, Default: "default", OptionsEndpoint: "nodes/groups.options"},
 		c.Select("kind", "套餐类型", "subscription|订阅 / 续费", "time|仅延长时间", "traffic|流量加油包", "reset|重置流量"),
 		{Key: "periods", Label: "购买周期与价格", Type: "periods", Required: true},
 		{Key: "enabled", Label: "上架", Type: "boolean", Default: true},
@@ -35,8 +35,8 @@ func couponResource() p.Resource {
 }
 func checkoutAction() p.Action {
 	f := c.Field("channelId", "支付渠道", "select", true)
-	f.OptionsEndpoint = "/api/v1/extensions/payments/channels"
-	return p.Action{Key: "checkout", Label: "在线支付", Endpoint: "/api/v1/extensions/payments/checkout", Bind: map[string]string{"orderId": "id"}, Fields: []p.Field{f}, When: map[string][]string{"status": {"pending"}}}
+	f.OptionsEndpoint = "payments/channels.list"
+	return p.Action{Key: "checkout", Label: "在线支付", Endpoint: "payments/checkout", Bind: map[string]string{"orderId": "id"}, Fields: []p.Field{f}, When: map[string][]string{"status": {"pending"}}}
 }
 func (a *app) planView(r *http.Request) (p.View, error) {
 	res := planResource()
@@ -46,14 +46,14 @@ func (a *app) planView(r *http.Request) (p.View, error) {
 		res.Editable = false
 		res.Deletable = false
 		period := c.Field("periodId", "购买周期", "select", true)
-		period.OptionsEndpoint = "/api/v1/extensions/commerce/plans/{id}/period-options"
-		res.Actions = []p.Action{{Key: "buy", Label: "购买", Endpoint: "/orders", Bind: map[string]string{"planId": "id"}, Fields: []p.Field{period, c.Field("coupon", "优惠码", "text", false)}}}
+		period.OptionsEndpoint = "commerce/plans.periodOptions?id={id}"
+		res.Actions = []p.Action{{Key: "buy", Label: "购买", Endpoint: "commerce/orders.create", Bind: map[string]string{"planId": "id"}, Fields: []p.Field{period, c.Field("coupon", "优惠码", "text", false)}}}
 	}
 	return p.View{Title: "套餐", Resources: []p.Resource{res}}, nil
 }
 func (a *app) orderView(r *http.Request) (p.View, error) {
 	f := c.Field("periodId", "套餐与周期", "select", true)
-	f.OptionsEndpoint = "/api/v1/extensions/commerce/period-options"
+	f.OptionsEndpoint = "commerce/period-options.list"
 	fields := []p.Field{f, c.Field("coupon", "优惠码", "text", false)}
 	if p.Admin(r) {
 		fields = append([]p.Field{c.UserField()}, fields...)

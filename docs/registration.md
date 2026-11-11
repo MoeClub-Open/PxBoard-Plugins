@@ -31,16 +31,16 @@ OAuth 插件通过本插件只读的注册政策决定能否创建新账号。�
 
 ## 接口
 
-以下路径以 `/api/v1/extensions/registration` 为前缀，成功返回 `{"data":...}`。
+对外接口通过 `POST /rpc/v1/registration/{method}` 调用，成功返回 `{"data":...}`；跨插件内部接口经核心运行时通道调用。
 
-| 方法与路径 | 权限与用途 |
+| 过程 / 内部路径 | 权限与用途 |
 | --- | --- |
-| `POST /register` | 公开；参数 `email/password/name?/referral?`，返回 `{id,message}` |
-| `GET /settings` | 管理员；返回包含唯一配置的数组 |
-| `PATCH /settings` | 管理员；参数 `{enabled:boolean}` |
-| `GET /internal/policy` | OAuth、核心或管理员；返回 `{enabled:boolean}` |
-| `GET /internal/registrations` | 推广插件或管理员；返回 `[{userId,referral?,registeredAt}]` |
-| `GET /_capabilities` | 仅内部核心调用；返回 `{"auth.registration":boolean}` |
+| `register` | 公开；参数 `email/password/name?/referral?`，返回 `{id,message}` |
+| `settings.list` | 管理员；返回包含唯一配置的数组 |
+| `settings.update` | 管理员；参数 `{enabled:boolean}` |
+| 内部 `GET /internal/policy` | OAuth 或核心经运行时通道读取；返回 `{enabled:boolean}` |
+| 内部 `GET /internal/registrations` | 推广插件经运行时通道读取；返回 `[{userId,referral?,registeredAt}]` |
+| 内部 `GET /_capabilities` | 仅内部核心调用；返回 `{"auth.registration":boolean}` |
 
 注册表单通过标准插件 `auth` 声明提供，继续使用核心通用注册页面。配置资源使用单记录接口，不需要拼接记录 ID 的重复路径。
 

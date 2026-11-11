@@ -87,7 +87,9 @@ func (a *app) enrichedFor(user string) ([]p.Record, error) {
 				return nil, e
 			}
 		}
-		used := totals[p.Text(row, "userId")+"-"+p.Text(row, "cycleStart")] / 1073741824
+		usedBytes := totals[p.Text(row, "userId")+"-"+p.Text(row, "cycleStart")]
+		used := usedBytes / 1073741824
+		row["usedBytes"] = usedBytes
 		row["usedGiB"] = used
 		u := byUser[p.Text(row, "userId")]
 		row["email"] = u["email"]
@@ -100,7 +102,7 @@ func (a *app) enrichedFor(user string) ([]p.Record, error) {
 
 func clientAccount(row p.Record) p.Record {
 	out := p.Record{}
-	for _, key := range []string{"id", "userId", "numericId", "credential", "proxyPassword", "email", "effective", "status", "quotaGiB", "unlimited", "usedGiB", "expiresAt", "groups", "accessLevel", "levelExpiresAt", "allNodeGroups", "speedLimitMbps", "deviceLimit", "planFamilyId", "cycleStart", "entitlementRevision", "lastGrantId"} {
+	for _, key := range []string{"id", "userId", "numericId", "credential", "proxyPassword", "email", "effective", "status", "quotaGiB", "unlimited", "usedBytes", "usedGiB", "expiresAt", "groups", "accessLevel", "levelExpiresAt", "allNodeGroups", "speedLimitMbps", "deviceLimit", "planFamilyId", "cycleStart", "entitlementRevision", "lastGrantId"} {
 		if value, ok := row[key]; ok {
 			out[key] = value
 		}
@@ -109,7 +111,7 @@ func clientAccount(row p.Record) p.Record {
 }
 
 func (a *app) userAccount(w http.ResponseWriter, r *http.Request) {
-	if !p.Admin(r) && !p.Service(r, "commerce") && !p.Service(r, "nodes") && !p.Service(r, "redeem") {
+	if !p.Admin(r) && !p.Service(r, "commerce") && !p.Service(r, "nodes") && !p.Service(r, "redeem") && !p.Service(r, "subscriptions") {
 		p.Fail(w, 403, "无权读取账户权益")
 		return
 	}

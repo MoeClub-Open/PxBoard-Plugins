@@ -26,7 +26,7 @@ func New() http.Handler {
 	a.Mux.HandleFunc("PATCH /routing", a.routing)
 	a.Mux.HandleFunc("GET /settings/public", a.publicSettings)
 	a.Mux.HandleFunc("GET /s/{token}", a.export)
-	a.Mux.HandleFunc("GET /configuration", a.configuration)
+	a.RPC("client.profile", a.clientProfile)
 	return a
 }
 func (a *app) view(r *http.Request) (p.View, error) {

@@ -27,11 +27,9 @@ func (a *app) subscriptionSettings() (p.Record, error) {
 }
 
 func (a *app) publicSettings(w http.ResponseWriter, r *http.Request) {
-	if !c.Member(w, r) {
-		return
-	}
 	config, err := a.subscriptionSettings()
 	if !c.Err(w, err) {
+		w.Header().Set("Cache-Control", "no-store")
 		p.JSON(w, p.Record{"hideFromBrowsers": p.Bool(config, "hideFromBrowsers")})
 	}
 }

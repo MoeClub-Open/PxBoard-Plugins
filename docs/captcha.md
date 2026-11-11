@@ -16,8 +16,8 @@
 
 订阅验证可复用这里配置的服务：先启用并配置人机验证，再在后台“订阅与客户端”打开订阅验证，默认关闭。启用后，用户须登录并对每条订阅链接分别完成一次验证，验证前不会显示新链接；验证后客户端可以持续拉取。已发出的旧地址在完成验证前也不能拉取。重置订阅链接或者关闭后重新开启验证时，需要重新验证。服务不可用或插件停用不会使未验证的链接自动放行；已验证的客户端可以继续自动更新。关闭订阅验证则恢复普通订阅拉取。
 
-接口：已登录用户可通过 `GET /api/v1/extensions/subscriptions/verification` 查看开关，通过 `POST /api/v1/extensions/subscriptions/links/{id}/verify` 提交 `challengeToken`；订阅列表返回 `verificationRequired` 和 `verified`。管理员可在 `PATCH /api/v1/extensions/subscriptions/verification/settings` 设置 `enabled`。
+接口：已登录用户可通过 `POST /rpc/v1/subscriptions/verification.get` 查看开关，通过 `POST /rpc/v1/subscriptions/links.verify` 提交 `id` 与 `challengeToken`；订阅列表返回 `verificationRequired` 和 `verified`。管理员可在 `POST /rpc/v1/subscriptions/verification.settings.update` 设置 `enabled`。
 
-接口：`GET /api/v1/auth/challenge` 返回公开配置；登录、请求找回密码、声明为注册表单的插件接口和身份插件 `/authorize` 接收 `challengeToken`。没有安装或启用验证插件时，接口返回 `enabled: false`。验证插件不处理账户密码，也不记录验证凭证。
+接口：`POST /rpc/v1/core/auth.challenge` 返回公开配置；登录、请求找回密码、声明为注册表单的插件过程和身份插件 `oauth/authorize` 接收 `challengeToken`。没有安装或启用验证插件时，接口返回 `enabled: false`。验证插件不处理账户密码，也不记录验证凭证。
 
 参考官方文档：[Turnstile](https://developers.cloudflare.com/turnstile/get-started/)、[hCaptcha](https://docs.hcaptcha.com/)、[reCAPTCHA v2](https://developers.google.com/recaptcha/docs/display)。

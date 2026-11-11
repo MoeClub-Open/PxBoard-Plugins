@@ -26,15 +26,14 @@
 
 ## 接口
 
-路径以 `/api/v1/extensions/redeem` 为前缀，成功响应为 `{"data":...}`。所有兑换需要有效用户会话。
+接口统一通过 `POST /rpc/v1/redeem/{method}` 调用，成功响应为 `{"data":...}`。所有兑换需要有效用户会话。
 
-| 方法与路径 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET/POST /codes` | 管理员查看或创建兑换码 |
-| `PATCH/DELETE /codes/{id}` | 管理员修改或删除未使用的码 |
-| `POST /redeem` | 当前用户兑换，参数为 `code` 和 `requestId` |
-| `GET /claims` | 普通用户读取自己的记录；管理员读取全部 |
-| `GET /claims?mine=1` | 只读取当前用户的兑换记录，管理员也适用 |
+| `codes.list` / `codes.create` | 管理员查看或创建兑换码 |
+| `codes.update` / `codes.delete`（含 `id`） | 管理员修改或删除未使用的码 |
+| `redeem.create` | 当前用户兑换，参数为 `code` 和 `requestId` |
+| `claims.list` | 普通用户读取自己的记录；管理员传入 `{"mine":true}` 仅读取自己的记录，不传则读取全部 |
 
 客户端为一次提交生成稳定的 `requestId`，失败重试保留它，成功或更换兑换码后生成新值。每账号限兑一次的码可省略该字段；允许同账号多次兑换的码必须提供它。
 

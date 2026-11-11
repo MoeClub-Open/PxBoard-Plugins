@@ -77,9 +77,25 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, e) {
 		return
 	}
-	routes, e := a.C.List("public_routes")
+	customBase, e := a.customSubscriptionBase()
 	if c.Err(w, e) {
 		return
+	}
+	emails := map[string]any{}
+	for _, u := range users {
+		emails[p.Text(u, "id")] = u["email"]
+	}
+	for _, row := range rows {
+		enrichLinkRecord(row, policy, customBase, emails[p.Text(row, "userId")])
+	}
+	result.Items = rows
+	c.ListResponse(w, r, result)
+}
+
+func (a *app) customSubscriptionBase() (string, error) {
+	routes, e := a.C.List("public_routes")
+	if e != nil {
+		return "", e
 	}
 	customBase := ""
 	for _, route := range routes {
@@ -98,29 +114,27 @@ func (a *app) links(w http.ResponseWriter, r *http.Request) {
 		}
 		break
 	}
-	emails := map[string]any{}
-	for _, u := range users {
-		emails[p.Text(u, "id")] = u["email"]
+	return customBase, nil
+}
+
+func enrichLinkRecord(row, policy p.Record, customBase string, email any) {
+	row["verificationRequired"] = p.Bool(policy, "enabled")
+	row["verified"] = verified(row, policy)
+	delete(row, "verificationVersion")
+	if email != nil {
+		row["email"] = email
 	}
-	for _, row := range rows {
-		row["verificationRequired"] = p.Bool(policy, "enabled")
-		row["verified"] = verified(row, policy)
-		delete(row, "verificationVersion")
-		row["email"] = emails[p.Text(row, "userId")]
-		if p.Bool(policy, "enabled") && !p.Bool(row, "verified") {
-			delete(row, "token")
-			continue
-		}
-		base := "/api/v1/extensions/subscriptions/s/" + url.PathEscape(p.Text(row, "token"))
-		if customBase != "" {
-			base = customBase + "/" + url.PathEscape(p.Text(row, "token"))
-		}
-		row["clashUrl"] = base + "?format=clash"
-		row["singboxUrl"] = base + "?format=sing-box"
-		row["shareUrl"] = base
+	if p.Bool(policy, "enabled") && !p.Bool(row, "verified") {
+		delete(row, "token")
+		return
 	}
-	result.Items = rows
-	c.ListResponse(w, r, result)
+	base := "/api/v1/extensions/subscriptions/s/" + url.PathEscape(p.Text(row, "token"))
+	if customBase != "" {
+		base = customBase + "/" + url.PathEscape(p.Text(row, "token"))
+	}
+	row["clashUrl"] = base + "?format=clash"
+	row["singboxUrl"] = base + "?format=sing-box"
+	row["shareUrl"] = base
 }
 
 func (a *app) rotate(w http.ResponseWriter, r *http.Request) {

@@ -10,13 +10,13 @@
 
 ## 接口
 
-路径前缀为 `/api/v1/extensions/branding`。响应使用 `{"data":...}`。
+接口统一通过 `POST /rpc/v1/branding/{method}` 调用，响应使用 `{"data":...}`。
 
-| 方法与路径 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET /public` | 公开读取 `name`、`logoUrl`、`faviconUrl` 三个展示字段 |
-| `GET /settings` | 管理员读取品牌设置的单记录数组 |
-| `PATCH /settings` | 管理员更新站点名称、Logo 和网站图标 |
+| `public.get` | 公开读取 `name`、`logoUrl`、`faviconUrl` 三个展示字段 |
+| `settings.list` | 管理员读取品牌设置的单记录数组 |
+| `settings.update` | 管理员更新站点名称、Logo 和网站图标 |
 
 设置记录使用固定编号 `settings`，不提供重复创建入口。普通用户、匿名用户以及未获授权的插件不能修改品牌配置。品牌数据保存在 `branding/settings` 集合，独立于商业、推广、节点和兑换码插件。
 

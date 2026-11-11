@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -84,6 +83,8 @@ func (a *app) machineCredentials(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r) {
 		return
 	}
+	a.machineMu.Lock()
+	defer a.machineMu.Unlock()
 	row, e := a.Find("machines", r.PathValue("id"))
 	if c.Err(w, e) {
 		return
@@ -102,44 +103,6 @@ func (a *app) machineCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.JSON(w, p.Record{"token": row["key"], "identifier": row["number"], "identifierLabel": "服务器编号"})
-}
-
-func (a *app) machine(w http.ResponseWriter, r *http.Request) (p.Record, bool) {
-	number, e := strconv.ParseInt(r.PathValue("machine"), 10, 64)
-	if e != nil {
-		p.Fail(w, 400, "服务器编号无效")
-		return nil, false
-	}
-	rows, e := a.C.List("machines")
-	if c.Err(w, e) {
-		return nil, false
-	}
-	for _, row := range rows {
-		if int64(p.Number(row, "number")) == number && p.Bool(row, "enabled") && r.Header.Get("X-Machine-Key") == p.Text(row, "key") && p.Text(row, "key") != "" {
-			return row, true
-		}
-	}
-	p.Fail(w, 401, "服务器凭据无效或服务器已停用")
-	return nil, false
-}
-
-func (a *app) machineNode(w http.ResponseWriter, r *http.Request, machine p.Record) (p.Record, bool) {
-	number, e := strconv.ParseInt(r.PathValue("node"), 10, 64)
-	if e != nil {
-		p.Fail(w, 400, "节点编号无效")
-		return nil, false
-	}
-	rows, e := a.C.List("nodes")
-	if c.Err(w, e) {
-		return nil, false
-	}
-	for _, row := range rows {
-		if int64(p.Number(row, "wireId")) == number && row["machineId"] == machine["number"] && p.Bool(row, "enabled") && p.Text(row, "engine") == "noders" {
-			return row, true
-		}
-	}
-	p.Fail(w, 404, "节点不属于此服务器或已停用")
-	return nil, false
 }
 
 func sanitizeServerRecord(row p.Record, nodeCount int) p.Record {
@@ -188,6 +151,8 @@ func (a *app) machinesCRUD() {
 		if !c.Require(w, r) {
 			return
 		}
+		a.machineMu.Lock()
+		defer a.machineMu.Unlock()
 		var b p.Record
 		if c.Err(w, p.Decode(r, &b)) {
 			return
@@ -229,6 +194,8 @@ func (a *app) machinesCRUD() {
 		if !c.Require(w, r) {
 			return
 		}
+		a.machineMu.Lock()
+		defer a.machineMu.Unlock()
 		old, e := a.Find("machines", r.PathValue("id"))
 		if c.Err(w, e) {
 			return
@@ -259,6 +226,8 @@ func (a *app) machinesCRUD() {
 		if !c.Require(w, r) {
 			return
 		}
+		a.machineMu.Lock()
+		defer a.machineMu.Unlock()
 		row, e := a.Find("machines", r.PathValue("id"))
 		if c.Err(w, e) {
 			return
@@ -283,18 +252,6 @@ func (a *app) machineAPI() {
 	a.machinesCRUD()
 	a.View("machines", a.machinesView)
 	a.Mux.HandleFunc("POST /machines/{id}/{action}", a.machineCredentials)
-	base := "/machines/{machine}"
-	a.Mux.HandleFunc("GET "+base+"/handshake", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := a.machine(w, r); ok {
-			p.JSON(w, p.Record{"apiVersion": "1.0", "transport": "poll", "capabilities": []string{"multiNode", "trafficOutbox", "onlineAccounts", "managedConfiguration"}})
-		}
-	})
-	a.configurationAPI(base)
-	a.Mux.HandleFunc("GET "+base+"/nodes", a.machineNodes)
-	a.Mux.HandleFunc("GET "+base+"/nodes/{node}/config", a.machineConfig)
-	a.Mux.HandleFunc("GET "+base+"/nodes/{node}/users", a.machineUsers)
-	a.Mux.HandleFunc("POST "+base+"/nodes/{node}/traffic", a.machineTraffic)
-	a.Mux.HandleFunc("POST "+base+"/nodes/{node}/alive", a.machineTelemetry)
-	a.Mux.HandleFunc("POST "+base+"/nodes/{node}/status", a.machineTelemetry)
-	a.Mux.HandleFunc("POST "+base+"/status", a.machineTelemetry)
+	a.configurationAPI()
+	a.serverRPC()
 }

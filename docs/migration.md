@@ -240,10 +240,10 @@ SSPanel VMess 依据原 `security` 决定是否启用 TLS；不会对原先未�
 通用订阅地址为：
 
 ```text
-https://panel.example.com/api/v1/extensions/subscriptions/s/原订阅令牌
+https://panel.example.com/s/原订阅令牌
 ```
 
-通用地址根据客户端标识选择格式：识别到 sing-box 或 Hiddify 等返回 sing-box 配置，v2rayN、v2rayNG 或 Shadowrocket 等返回节点链接，其余默认返回 Mihomo 配置。需要固定格式时可在地址末尾添加 `?format=clash`、`?format=sing-box` 或 `?format=uri`。即使令牌未变，旧面板路径仍需要在客户端更新，除非管理员单独配置旧地址转发。节点接入且用户连接成功后，再完成域名或服务入口切换。保留源站备份和旧服务恢复方式，直到确认切换完成。
+面板同时兼容 `/api/v1/extensions/subscriptions/s/原订阅令牌`。通用地址根据客户端标识选择格式：识别到 sing-box 或 Hiddify 等返回 sing-box 配置，v2rayN、v2rayNG 或 Shadowrocket 等返回节点链接，其余默认返回 Mihomo 配置。需要固定格式时可在地址末尾添加 `?format=clash`、`?format=sing-box` 或 `?format=uri`。即使令牌未变，旧面板路径仍需要在客户端更新，除非管理员单独配置旧地址转发。节点接入且用户连接成功后，再完成域名或服务入口切换。保留源站备份和旧服务恢复方式，直到确认切换完成。
 
 Mieru 支持 Mihomo（`format=clash`）和官方 `mierus://` 分享链接（`format=uri`），用户名与密码沿用原 UUID。sing-box 不支持原生 Mieru，因此混合订阅会保留可用节点并跳过 Mieru，响应头 `X-PxBoard-Skipped-Protocols` 会列出跳过的协议；若全部节点均不支持，则返回明确错误，避免生成只能直连的空代理配置。其他尚未支持的协议采用相同规则。
 
@@ -290,16 +290,16 @@ node tools/migrate-node-groups.ts --database /绝对路径/pxboard.db --apply
 
 ## 管理 API
 
-以下路径以 `/api/v1/extensions/import-<source>` 为前缀，`<source>` 为 `sspanel`、`v2board` 或 `xboard`。需要管理员登录会话或有写权限的管理员访问密钥。成功响应使用 `{"data":...}`，错误使用 `{"error":{"code":"...","message":"..."}}`。
+以下过程通过 `POST /rpc/v1/import-<source>/{method}` 调用，`<source>` 为 `sspanel`、`v2board` 或 `xboard`。需要管理员登录会话或有写权限的管理员访问密钥。成功响应使用 `{"data":...}`，错误使用 `{"error":{"code":"...","message":"..."}}`。
 
-| 方法与路径 | 用途 |
+| 过程 | 用途 |
 | --- | --- |
-| `GET /jobs` | 获取任务状态和报告摘要；不返回数据库连接、密码盐或任务密钥种子 |
-| `POST /jobs` | 创建任务 |
-| `POST /jobs/{id}/preview` | 异步准备、转换并检查；返回后轮询任务状态 |
-| `POST /jobs/{id}/report` | 获取 `{title, details}` 形式的完整报告 |
-| `POST /jobs/{id}/apply` | 异步提交已准备好的任务 |
-| `GET /archive?jobId=...&table=...&offset=0` | 按表读取已提交任务的原始归档，每页 50 行，返回 `{items,total}` |
+| `jobs.list` | 获取任务状态和报告摘要；不返回数据库连接、密码盐或任务密钥种子 |
+| `jobs.create` | 创建任务 |
+| `jobs.preview`（含 `id`） | 异步准备、转换并检查；返回后轮询任务状态 |
+| `jobs.report`（含 `id`） | 获取 `{title, details}` 形式的完整报告 |
+| `jobs.apply`（含 `id`） | 异步提交已准备好的任务 |
+| `archive.get`（含 `jobId/table/offset`） | 按表读取已提交任务的原始归档，每页 50 行，返回 `{items,total}` |
 
 快照任务请求示例：
 

@@ -18,6 +18,7 @@ func New() http.Handler {
 	}
 	a.Mux.HandleFunc("POST /attachments", a.upload)
 	a.Mux.HandleFunc("GET /attachments/{id}", a.download)
+	a.RPC("attachments.get", a.attachmentRPC)
 	a.Mux.HandleFunc("GET /tickets", a.tickets)
 	a.Mux.HandleFunc("POST /tickets", a.ticket)
 	a.Mux.HandleFunc("POST /tickets/{id}/{action}", a.ticketAction)

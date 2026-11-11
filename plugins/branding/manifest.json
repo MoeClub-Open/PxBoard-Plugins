@@ -11,8 +11,8 @@
   "permissions": [
     "storage:own"
   ],
-  "publicPaths": [
-    "/public"
+  "publicProcedures": [
+    "public.get"
   ],
   "pages": [
     {

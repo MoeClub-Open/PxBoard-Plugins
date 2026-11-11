@@ -121,7 +121,7 @@ func main() {
 			save(path, st)
 		}
 		body, _ := json.Marshal(st.Pending)
-		req, e := http.NewRequestWithContext(ctx, "POST", strings.TrimSuffix(*core, "/")+"/api/v1/extensions/nodes/agent/sync", bytes.NewReader(body))
+		req, e := http.NewRequestWithContext(ctx, "POST", strings.TrimSuffix(*core, "/")+"/rpc/v1/nodes/agent.sync", bytes.NewReader(body))
 		if e != nil {
 			log.Fatal(e)
 		}

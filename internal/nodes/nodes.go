@@ -4,16 +4,20 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-type app struct{ *c.App }
+type app struct {
+	*c.App
+	machineMu sync.Mutex
+}
 
 func New() http.Handler {
-	a := &app{c.New()}
+	a := &app{App: c.New()}
 	a.machineAPI()
 	a.monitoring()
 	a.settingsAPI()

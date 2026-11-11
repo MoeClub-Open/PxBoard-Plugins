@@ -10,6 +10,6 @@
 
 上传图片保存在 `PX_PLUGIN_STATE_DIR/attachments/`，记录与权限信息保存在面板数据库。备份或迁移时必须一并备份完整面板数据目录；仅备份数据库无法恢复图片。升级或停用插件不会删除附件。上传但未发送的图片会保留在数据目录中。
 
-接口：登录用户 `POST /api/v1/extensions/support/attachments`，JSON 正文 `{"data":"图片 Base64"}`，返回附件 `id` 与受权限保护的 `url`；`GET` 该地址返回图片。用户工单通过 `POST /tickets` 的 `content` 和 `POST /tickets/{id}/reply` 的 `message` 提交 Markdown；系统检查站内图片引用的权限。图片内容不是公开文件，不能直接作为免登录图床使用。
+接口：登录用户调用 `POST /rpc/v1/support/attachments.create`，JSON 正文 `{"data":"图片 Base64"}`，返回附件 `id` 与受权限保护的内联地址 `/files/support/attachments/{id}`（旧工单已保存的 `/api/v1/extensions/support/attachments/{id}` 仍兼容访问，客户端也可通过 `support/attachments.get` 获取 Base64 元数据）。用户工单通过 `support/tickets.create` 的 `content` 和 `support/tickets.reply` 的 `id`、`message` 提交 Markdown；系统检查站内图片引用的权限。图片内容不是公开文件，不能直接作为免登录图床使用。
 
 工单回复与待通知记录一并保存。通知暂时无法入队时，回复仍然保存成功，后台稍后补发；同一工单的多条回复分别保留通知记录。关闭工单不会发送回复通知。
