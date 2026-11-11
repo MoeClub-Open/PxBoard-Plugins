@@ -10,7 +10,7 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-const defaultIntroduction = "覆盖亚太、北美与欧洲机房的加密网络接入服务，为跨区域访问、远程协作与日常终端连接提供稳定通道。"
+const defaultIntroduction = "提供加密网络接入，按访问需求选择线路，并在账户中集中管理订阅。"
 
 type routeEntry struct {
 	Title       string `json:"title"`
@@ -23,44 +23,19 @@ type featureEntry struct {
 	Description string `json:"description"`
 }
 
-func defaultRoutes() []routeEntry {
-	return []routeEntry{
-		{
-			Title:       "亚太高速接入",
-			Region:      "香港 · 日本 · 新加坡",
-			Description: "毗邻核心国际海缆与优质直连入口，提供低延迟响应，适合高频网页浏览、即时通讯与流媒体播放。",
-		},
-		{
-			Title:       "北美骨干互联",
-			Region:      "美西 · 美东",
-			Description: "接入高带宽北美数据中心骨干网络，兼顾跨洋吞吐能力，适合开发工具、云端平台与大体积数据传输。",
-		},
-		{
-			Title:       "欧洲多点覆盖",
-			Region:      "德国 · 荷兰 · 瑞士",
-			Description: "部署多国独立接入节点与冗余出口路由，满足跨区域业务访问、地区内容解锁及备用线路切换。",
-		},
-		{
-			Title:       "抗干扰传输架构",
-			Region:      "TLS · IPv4 / IPv6",
-			Description: "采用现代加密传输协议与多栈接入地址，针对晚高峰与复杂网络环境优化连接稳定性。",
-		},
-	}
-}
-
 func defaultFeatures() []featureEntry {
 	return []featureEntry{
 		{
-			Title:       "主流客户端通用订阅",
-			Description: "通过同一订阅地址按客户端标识自动下发节点与分流规则，支持桌面端、移动端及路由设备直接导入。",
+			Title:       "导入订阅即可连接",
+			Description: "将订阅地址导入兼容客户端，在电脑、手机和路由器上使用。",
 		},
 		{
-			Title:       "多链接与凭据隔离",
-			Description: "支持按设备单独创建订阅链接并绑定客户端类型，连接凭据与账户密码相互独立，异常时可随时重置。",
+			Title:       "按设备管理订阅",
+			Description: "为不同设备创建独立链接，按需绑定客户端或重置链接。",
 		},
 		{
-			Title:       "自助管理与状态可视",
-			Description: "在线完成多周期开通、套餐折抵升级、兑换码核销与工单咨询，实时查看周期流量明细与服务器负载。",
+			Title:       "套餐与用量随时查看",
+			Description: "在账户中查看流量用量、套餐有效期与订阅信息。",
 		},
 	}
 }
@@ -151,7 +126,7 @@ func (a *app) config() (p.Record, error) {
 		"description":     "",
 		"heading":         "",
 		"introduction":    defaultIntroduction,
-		"routes":          defaultRoutes(),
+		"routes":          []routeEntry{},
 		"features":        defaultFeatures(),
 		"footer":          "",
 		"socialImageUrl":  "",
@@ -168,8 +143,11 @@ func (a *app) config() (p.Record, error) {
 		}
 		if value, ok := row["introduction"]; ok && strings.TrimSpace(p.Text(row, "introduction")) != "" {
 			out["introduction"] = value
-		} else if _, customIntro := row["introductionCustomized"]; customIntro {
+		} else if p.Bool(row, "introductionCustomized") {
 			out["introduction"] = p.Text(row, "introduction")
+		}
+		if p.Bool(row, "introductionCustomized") {
+			out["introductionCustomized"] = true
 		}
 		if value, ok := row["indexingEnabled"]; ok {
 			out["indexingEnabled"] = value
