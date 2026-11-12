@@ -86,12 +86,21 @@ func (a *app) clientProfile(w http.ResponseWriter, r *http.Request) {
 		if len(compatible) > 0 {
 			generated := make([]map[string]any, 0, len(compatible))
 			clientNodes = make([]p.Record, 0, len(compatible))
+			email := strings.TrimSpace(p.Text(account, "email"))
+			if email == "" {
+				email = strings.TrimSpace(subject.Email)
+			}
 			for _, node := range compatible {
 				pwd := subscriptionPassword(account, node)
 				uuid := p.Text(account, "credential")
 				proxy := aerion(node, pwd, uuid)
+				clientNode := aerionClientNode(node, pwd, uuid)
+				if p.Text(node, "protocol") == "naive" && email != "" {
+					proxy["username"] = email
+					clientNode["username"] = email
+				}
 				generated = append(generated, map[string]any(proxy))
-				clientNodes = append(clientNodes, aerionClientNode(node, pwd, uuid))
+				clientNodes = append(clientNodes, clientNode)
 			}
 			template, _, loadErr := a.selectedTemplate("clash")
 			if c.Err(w, loadErr) {

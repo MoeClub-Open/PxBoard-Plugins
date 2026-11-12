@@ -144,6 +144,11 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 			var proxy p.Record
 			if format == "aerion" {
 				proxy = aerion(node, subscriptionPassword(account, node), p.Text(account, "credential"))
+				if p.Text(node, "protocol") == "naive" {
+					if email := strings.TrimSpace(p.Text(account, "email")); email != "" {
+						proxy["username"] = email
+					}
+				}
 			} else if format == "clash" {
 				proxy = clash(node, subscriptionPassword(account, node), p.Text(account, "credential"))
 			} else {

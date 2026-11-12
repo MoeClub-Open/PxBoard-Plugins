@@ -33,10 +33,16 @@ func fingerprint(n p.Record) string {
 
 func clashSecurity(n, out p.Record) {
 	if !p.Bool(n, "tls") {
+		if proto := p.Text(n, "protocol"); proto == "vless" || proto == "vmess" {
+			out["tls"] = false
+		}
 		return
 	}
 	settings := tlsSettings(n)
-	out["tls"], out["servername"], out["sni"] = true, n["serverName"], n["serverName"]
+	out["tls"] = true
+	if sni := strings.TrimSpace(p.Text(n, "serverName")); sni != "" {
+		out["servername"], out["sni"] = sni, sni
+	}
 	if p.Bool(settings, "allow_insecure") {
 		out["skip-cert-verify"] = true
 	}
@@ -71,7 +77,10 @@ func singboxSecurity(n, out p.Record) {
 		return
 	}
 	settings := tlsSettings(n)
-	tls := p.Record{"enabled": true, "server_name": n["serverName"]}
+	tls := p.Record{"enabled": true}
+	if sni := strings.TrimSpace(p.Text(n, "serverName")); sni != "" {
+		tls["server_name"] = sni
+	}
 	if p.Bool(settings, "allow_insecure") {
 		tls["insecure"] = true
 	}

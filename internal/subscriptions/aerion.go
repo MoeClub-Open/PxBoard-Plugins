@@ -8,24 +8,156 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func naiveAerion(n p.Record, cred string) p.Record {
+	out := p.Record{
+		"name":     n["name"],
+		"type":     "naive",
+		"server":   n["host"],
+		"port":     n["port"],
+		"password": cred,
+	}
+	options := object(n, "protocolOptions")
+	transport := strings.ToLower(strings.TrimSpace(p.Text(n, "transport")))
+	if transport == "quic" || transport == "h3" || transport == "http3" || p.Bool(options, "quic") {
+		out["quic"] = true
+	}
+	if cc := strings.TrimSpace(p.Text(options, "congestion_control")); cc != "" {
+		out["quic_congestion_control"] = cc
+	} else if cc := strings.TrimSpace(p.Text(options, "quic_congestion_control")); cc != "" {
+		out["quic_congestion_control"] = cc
+	}
+	if hdrs := object(options, "extra_headers"); len(hdrs) > 0 {
+		out["extra_headers"] = hdrs
+	}
+	clashSecurity(n, out)
+	return out
+}
+
 func aerion(n p.Record, cred, uuid string) p.Record {
-	if p.Text(n, "protocol") == "flux" {
+	switch p.Text(n, "protocol") {
+	case "flux":
 		return fluxClash(n, cred, uuid)
+	case "naive":
+		return naiveAerion(n, cred)
 	}
 	return clash(n, cred, uuid)
 }
 
+func anyMapRecord(v any) p.Record {
+	switch m := v.(type) {
+	case p.Record:
+		return m
+	case map[string]any:
+		return p.Record(m)
+	default:
+		return nil
+	}
+}
+
 func aerionClientNode(n p.Record, cred, uuid string) p.Record {
 	proxy := aerion(n, cred, uuid)
-	out := make(p.Record, len(proxy)+2)
+	out := make(p.Record, len(proxy)+6)
 	for k, v := range proxy {
+		if v == nil && (k == "sni" || k == "servername") {
+			continue
+		}
 		out[k] = v
 	}
 	if server, ok := out["server"]; ok {
 		out["host"] = server
 	}
-	if skip, ok := out["skip-cert-verify"]; ok {
+	skip := p.Bool(out, "skip-cert-verify") || p.Bool(out, "insecure")
+	if _, hasSkip := out["skip-cert-verify"]; hasSkip || skip {
 		out["insecure"] = skip
+	}
+	if rawTLS, hasTLS := out["tls"]; hasTLS {
+		if tlsEnabled, isBool := rawTLS.(bool); isBool {
+			tlsObj := p.Record{"enabled": tlsEnabled}
+			if tlsEnabled {
+				sni := strings.TrimSpace(p.Text(out, "sni"))
+				if sni == "" {
+					sni = strings.TrimSpace(p.Text(out, "servername"))
+				}
+				if sni == "" {
+					sni = strings.TrimSpace(p.Text(n, "serverName"))
+				}
+				if sni != "" {
+					tlsObj["server_name"] = sni
+					out["sni"] = sni
+				}
+				if skip {
+					tlsObj["insecure"] = true
+				}
+				if alpn, ok := out["alpn"]; ok && alpn != nil {
+					tlsObj["alpn"] = alpn
+				}
+				if ro := anyMapRecord(out["reality-opts"]); ro != nil {
+					pubKey, shortID := p.Text(ro, "public-key"), p.Text(ro, "short-id")
+					tlsObj["reality"] = p.Record{"enabled": true, "public_key": pubKey, "short_id": shortID}
+					out["reality_opts"] = p.Record{"public_key": pubKey, "short_id": shortID}
+				}
+			}
+			out["tls"] = tlsObj
+		}
+	}
+	if fp := strings.TrimSpace(p.Text(out, "client-fingerprint")); fp != "" {
+		out["client_fingerprint"] = fp
+	}
+	if streamProtocol(n) && network(n) != "tcp" {
+		kind, settings := network(n), object(n, "transportSettings")
+		tr := p.Record{"type": kind}
+		switch kind {
+		case "grpc":
+			if sn := strings.TrimSpace(p.Text(settings, "serviceName")); sn != "" {
+				tr["service_name"] = sn
+			}
+		case "ws", "httpupgrade":
+			if path := strings.TrimSpace(p.Text(settings, "path")); path != "" {
+				tr["path"] = path
+			}
+			if host := strings.TrimSpace(transportHost(settings)); host != "" {
+				tr["host"] = host
+			}
+			if hdrs := object(settings, "headers"); len(hdrs) > 0 {
+				tr["headers"] = hdrs
+			}
+		case "h2":
+			if path := strings.TrimSpace(p.Text(settings, "path")); path != "" {
+				tr["path"] = path
+			}
+			if host := strings.TrimSpace(transportHost(settings)); host != "" {
+				tr["host"] = host
+			}
+		case "xhttp":
+			if path := strings.TrimSpace(p.Text(settings, "path")); path != "" {
+				tr["path"] = path
+			}
+			if host := strings.TrimSpace(transportHost(settings)); host != "" {
+				tr["host"] = host
+			}
+			if mode := strings.TrimSpace(p.Text(settings, "mode")); mode != "" {
+				tr["mode"] = mode
+			}
+			if hdrs := object(settings, "headers"); len(hdrs) > 0 {
+				tr["headers"] = hdrs
+			}
+		}
+		out["transport"] = tr
+	}
+	if op := p.Text(out, "obfs-password"); op != "" {
+		out["obfs_password"] = op
+	}
+	if cc := p.Text(out, "congestion-controller"); cc != "" {
+		out["congestion_control"] = cc
+	}
+	if urm := p.Text(out, "udp-relay-mode"); urm != "" {
+		out["udp_relay_mode"] = urm
+	}
+	if tp := p.Text(out, "traffic-pattern"); tp != "" {
+		out["traffic_pattern"] = tp
+	}
+	if aid, ok := out["alterId"]; ok {
+		out["alter_id"] = aid
 	}
 	return out
 }

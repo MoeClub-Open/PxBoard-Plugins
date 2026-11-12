@@ -11,6 +11,11 @@ import (
 )
 
 func subscriptionPassword(account, n p.Record) string {
+	if p.Text(n, "engine") == "noders" && c.Allowed(p.Text(n, "protocol"), "anytls", "trojan", "tuic", "sudoku") {
+		if uuid := p.Text(account, "credential"); uuid != "" {
+			return uuid
+		}
+	}
 	password := c.PasswordFor(account, n)
 	options, _ := n["protocolOptions"].(map[string]any)
 	if p.Text(n, "protocol") == "shadowsocks" && strings.HasPrefix(cipher(n), "2022-") {
@@ -35,10 +40,49 @@ func cipher(n p.Record) string {
 	}
 	return value
 }
+func sudokuClash(n p.Record, uuid string) p.Record {
+	out := p.Record{"name": n["name"], "type": "sudoku", "server": n["host"], "port": n["port"], "key": uuid, "udp": true}
+	options := object(n, "protocolOptions")
+	nested := object(options, "sudoku")
+	for _, pair := range [][2]string{
+		{"aead", "aead-method"},
+		{"table_type", "table-type"},
+		{"padding_min", "padding-min"},
+		{"padding_max", "padding-max"},
+		{"enable_pure_downlink", "enable-pure-downlink"},
+		{"custom_table", "custom-table"},
+		{"custom_tables", "custom-tables"},
+		{"multiplex", "http-mask-multiplex"},
+		{"http_mask", "http-mask"},
+		{"http_mask_mode", "http-mask-mode"},
+		{"http_mask_tls", "http-mask-tls"},
+		{"http_mask_host", "http-mask-host"},
+		{"path_root", "path-root"},
+	} {
+		src, dst := pair[0], pair[1]
+		for _, m := range []p.Record{nested, options} {
+			if m == nil {
+				continue
+			}
+			if v, ok := m[src]; ok && v != nil && v != "" {
+				out[dst] = v
+				break
+			}
+			if v, ok := m[dst]; ok && v != nil && v != "" {
+				out[dst] = v
+				break
+			}
+		}
+	}
+	return out
+}
 func clash(n p.Record, cred, uuid string) p.Record {
 	proto := p.Text(n, "protocol")
 	if proto == "mieru" {
 		return mieruClash(n, uuid)
+	}
+	if proto == "sudoku" {
+		return sudokuClash(n, uuid)
 	}
 	typ := proto
 	if proto == "shadowsocks" {

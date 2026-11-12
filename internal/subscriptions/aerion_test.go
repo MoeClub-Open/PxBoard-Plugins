@@ -106,3 +106,130 @@ func TestSummarizeClientAccountStates(t *testing.T) {
 		t.Fatalf("unexpected unlimited summary: %q %#v", reason, unlimitedSummary)
 	}
 }
+
+func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T) {
+	anytlsNoSNI := aerionClientNode(p.Record{
+		"name":     "JP Osaka Oracle",
+		"protocol": "anytls",
+		"engine":   "noders",
+		"host":     "osa.example.com",
+		"port":     443.0,
+		"tls":      true,
+		"tlsMode":  "tls",
+	}, "secret", "uuid-1")
+	tlsMap, ok := anytlsNoSNI["tls"].(p.Record)
+	if !ok || tlsMap["enabled"] != true {
+		t.Fatalf("expected AnyTLS tls object with enabled=true, got %#v", anytlsNoSNI["tls"])
+	}
+	if _, hasSNI := anytlsNoSNI["sni"]; hasSNI {
+		t.Fatalf("expected nil serverName not to emit sni:null, got %#v", anytlsNoSNI["sni"])
+	}
+
+	vlessReality := aerionClientNode(p.Record{
+		"name":              "VLESS-REALITY",
+		"protocol":          "vless",
+		"host":              "edge.example.com",
+		"port":              443.0,
+		"tls":               true,
+		"tlsMode":           "reality",
+		"serverName":        "www.microsoft.com",
+		"realitySettings":   map[string]any{"public_key": "pub-key", "short_id": "0102"},
+		"transport":         "httpupgrade",
+		"transportSettings": map[string]any{"path": "/up", "host": "cdn.example.com"},
+		"protocolOptions":   map[string]any{"flow": "xtls-rprx-vision", "client_fingerprint": "chrome"},
+	}, "secret", "uuid-1")
+	vlessTLS, ok := vlessReality["tls"].(p.Record)
+	if !ok || vlessTLS["enabled"] != true || vlessTLS["server_name"] != "www.microsoft.com" {
+		t.Fatalf("unexpected VLESS tls object: %#v", vlessReality["tls"])
+	}
+	ro, ok := vlessReality["reality_opts"].(p.Record)
+	if !ok || ro["public_key"] != "pub-key" || ro["short_id"] != "0102" {
+		t.Fatalf("unexpected VLESS reality_opts: %#v", vlessReality["reality_opts"])
+	}
+	tr, ok := vlessReality["transport"].(p.Record)
+	if !ok || tr["type"] != "httpupgrade" || tr["path"] != "/up" || tr["host"] != "cdn.example.com" {
+		t.Fatalf("unexpected VLESS transport object: %#v", vlessReality["transport"])
+	}
+	if vlessReality["client_fingerprint"] != "chrome" {
+		t.Fatalf("missing client_fingerprint: %#v", vlessReality)
+	}
+
+	plainVless := aerionClientNode(p.Record{
+		"name":     "VLESS-Plain",
+		"protocol": "vless",
+		"host":     "plain.example.com",
+		"port":     80.0,
+		"tls":      false,
+	}, "secret", "uuid-1")
+	plainTLS, ok := plainVless["tls"].(p.Record)
+	if !ok || plainTLS["enabled"] != false {
+		t.Fatalf("expected plain VLESS tls.enabled=false, got %#v", plainVless["tls"])
+	}
+
+	hy2 := aerionClientNode(p.Record{
+		"name":            "HY2",
+		"protocol":        "hysteria2",
+		"host":            "hy2.example.com",
+		"port":            443.0,
+		"tls":             true,
+		"serverName":      "hy2.example.com",
+		"protocolOptions": map[string]any{"obfs": "salamander", "obfs_password": "obfs-secret"},
+	}, "secret", "uuid-1")
+	if hy2["obfs_password"] != "obfs-secret" {
+		t.Fatalf("missing obfs_password: %#v", hy2)
+	}
+
+	tuic := aerionClientNode(p.Record{
+		"name":            "TUIC",
+		"protocol":        "tuic",
+		"host":            "tuic.example.com",
+		"port":            443.0,
+		"tls":             true,
+		"serverName":      "tuic.example.com",
+		"protocolOptions": map[string]any{"congestion_control": "bbr", "udp_relay_mode": "quic"},
+	}, "uuid-1", "uuid-1")
+	if tuic["congestion_control"] != "bbr" || tuic["udp_relay_mode"] != "quic" {
+		t.Fatalf("missing TUIC snake_case fields: %#v", tuic)
+	}
+
+	sudokuNode := p.Record{
+		"name":            "Sudoku",
+		"protocol":        "sudoku",
+		"engine":          "noders",
+		"host":            "sudoku.example.com",
+		"port":            443.0,
+		"protocolOptions": map[string]any{"aead": "aes-128-gcm", "http_mask": true, "http_mask_mode": "ws", "multiplex": "on", "path_root": "edge"},
+	}
+	req := buildAerionCapabilityRequest("secapi.telecom.moe", []string{"anytls", "sudoku", "naive"})
+	if !supportedFormat(sudokuNode, "aerion", req) {
+		t.Fatal("expected Sudoku to be supported in aerion format")
+	}
+	sudokuOut := aerionClientNode(sudokuNode, "uuid-1", "uuid-1")
+	if sudokuOut["type"] != "sudoku" || sudokuOut["key"] != "uuid-1" || sudokuOut["http-mask-mode"] != "ws" || sudokuOut["http-mask-multiplex"] != "on" {
+		t.Fatalf("unexpected Sudoku client node: %#v", sudokuOut)
+	}
+
+	naiveNode := p.Record{
+		"name":       "Naive",
+		"protocol":   "naive",
+		"engine":     "noders",
+		"host":       "naive.example.com",
+		"port":       443.0,
+		"tls":        true,
+		"serverName": "naive.example.com",
+		"transport":  "quic",
+	}
+	if !supportedFormat(naiveNode, "aerion", req) || supportedFormat(naiveNode, "clash", req) {
+		t.Fatal("Naive should only be supported in aerion format")
+	}
+	naiveOut := aerionClientNode(naiveNode, "proxy-pass", "uuid-1")
+	naiveTLS, ok := naiveOut["tls"].(p.Record)
+	if !ok || naiveTLS["enabled"] != true || naiveOut["quic"] != true {
+		t.Fatalf("unexpected Naive client node: %#v", naiveOut)
+	}
+
+	migratedAcct := p.Record{"credential": "uuid-cred", "proxyPassword": "legacy-sspanel-pass"}
+	if got := subscriptionPassword(migratedAcct, p.Record{"engine": "noders", "protocol": "anytls"}); got != "uuid-cred" {
+		t.Fatalf("noders AnyTLS must use credential UUID, got %q", got)
+	}
+}

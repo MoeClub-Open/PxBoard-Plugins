@@ -4,6 +4,7 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 func network(n p.Record) string {
@@ -133,10 +134,57 @@ func uriTransport(n p.Record, q url.Values) {
 	}
 }
 
+func allowsDeclaredProtocol(r *http.Request, target string) bool {
+	if r == nil {
+		return true
+	}
+	hasExplicitTypes := false
+	for _, rawTypes := range r.URL.Query()["types"] {
+		for _, token := range strings.FieldsFunc(rawTypes, func(c rune) bool {
+			return c == ',' || c == '|' || c == '｜' || c == ' '
+		}) {
+			t := strings.ToLower(strings.TrimSpace(token))
+			if t == "" || t == "all" {
+				continue
+			}
+			hasExplicitTypes = true
+			if t == target {
+				return true
+			}
+		}
+	}
+	if hasExplicitTypes {
+		return false
+	}
+	hasExplicitHeader := false
+	for _, header := range r.Header.Values("X-XBClient-Protocols") {
+		for _, token := range strings.Split(header, ",") {
+			t := strings.ToLower(strings.TrimSpace(token))
+			if t == "" {
+				continue
+			}
+			hasExplicitHeader = true
+			if t == target {
+				return true
+			}
+		}
+	}
+	if hasExplicitHeader {
+		return false
+	}
+	return true
+}
+
 func supportedFormat(n p.Record, format string, r *http.Request) bool {
 	protocol := p.Text(n, "protocol")
 	if protocol == "flux" {
 		return format == "aerion" && supportsFlux(r)
+	}
+	if protocol == "sudoku" {
+		return (format == "aerion" || format == "clash") && allowsDeclaredProtocol(r, "sudoku")
+	}
+	if protocol == "naive" {
+		return format == "aerion" && allowsDeclaredProtocol(r, "naive")
 	}
 	if protocol == "mieru" {
 		return format != "sing-box"
