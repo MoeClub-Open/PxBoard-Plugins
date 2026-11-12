@@ -30,7 +30,7 @@ func New() http.Handler {
 	return a
 }
 func (a *app) view(r *http.Request) (p.View, error) {
-	res := p.Resource{Paginated: true, Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "创建订阅", Empty: "开通访问账户后，创建订阅链接", Deletable: true, Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("name", "名称", "text", false), c.Field("boundClient", "绑定客户端", "text", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，并解除客户端绑定，确定重置？"}}}
+	res := p.Resource{Paginated: true, Key: "links", Title: "订阅链接", Endpoint: "/links", CreateLabel: "创建订阅", Empty: "暂无订阅链接", Deletable: true, Columns: []p.Field{c.Field("email", "用户", "text", false), c.Field("name", "名称", "text", false), c.Field("boundClient", "绑定客户端", "text", false), c.Field("shareUrl", "通用订阅", "link", false)}, Actions: []p.Action{{Key: "rotate", Label: "重置链接", Confirm: "旧订阅链接会立即失效，并解除客户端绑定，确定重置？"}}}
 	if p.Admin(r) {
 		res.Fields = []p.Field{c.UserField(), c.Field("name", "名称", "text", false), {Key: "bindUserAgent", Label: "绑定首次使用的客户端", Type: "boolean", Hint: "客户端标识可以伪造，不能代替保管链接"}}
 		setting := p.Field{Key: "enabled", Label: "订阅拉取前要求人机验证", Type: "boolean", Hint: "启用后，用户需在订阅页面验证一次，客户端才能继续自动更新；关闭后重新启用时需重新验证。"}
@@ -39,5 +39,5 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		routeFields := []p.Field{{Key: "enabled", Label: "使用自定义订阅地址", Type: "boolean"}, {Key: "baseUrls", Label: "订阅域名", Type: "textarea", Hint: "多个地址用逗号或换行分隔，留空使用面板域名；域名需指向面板"}, {Key: "path", Label: "订阅路径", Type: "text"}}
 		return p.View{Title: "订阅与客户端", Resources: []p.Resource{res, templateResource(), templateSettingsResource(), {Key: "settings", Title: "订阅访问", Endpoint: "/settings", Singleton: true, Editable: true, Fields: []p.Field{browser, agents}, Columns: []p.Field{browser, agents}}, {Key: "routing", Title: "订阅地址", Endpoint: "/routing", Singleton: true, Editable: true, Fields: routeFields, Columns: routeFields}, {Key: "verification", Title: "订阅验证", Endpoint: "/verification/settings", Singleton: true, Editable: true, Fields: []p.Field{setting}, Columns: []p.Field{setting}}}}, nil
 	}
-	return p.View{Title: "订阅与客户端", Notice: "Mieru 节点请使用 Mihomo；sing-box 订阅仅包含其支持的节点。", Resources: []p.Resource{res}}, nil
+	return p.View{Title: "订阅与客户端", Resources: []p.Resource{res}}, nil
 }

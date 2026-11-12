@@ -145,5 +145,5 @@ func (a *app) event(e p.Event) error {
 }
 func (a *app) view(r *http.Request) (p.View, error) {
 	rows, e := a.C.List("logs")
-	return p.View{Title: "流量审计", Notice: "记录连接域名、协议与规则命中，不采集通信正文。命中记录保留 7 天；阻断规则在节点下次同步后生效。", Metrics: []p.Metric{{Label: "最近 7 天命中", Value: len(rows)}}, Resources: []p.Resource{ruleResource(), {Key: "logs", Title: "命中记录", Endpoint: "/logs", Columns: []p.Field{c.Field("createdAt", "时间", "datetime", false), c.Field("userId", "用户 ID", "text", false), c.Field("host", "目标域名", "text", false), c.Field("ruleName", "规则", "text", false), c.Field("action", "处理方式", "status", false)}}}}, e
+	return p.View{Title: "流量审计", Metrics: []p.Metric{{Label: "最近 7 天命中", Value: len(rows)}}, Resources: []p.Resource{ruleResource(), {Key: "logs", Title: "命中记录", Endpoint: "/logs", Columns: []p.Field{c.Field("createdAt", "时间", "datetime", false), c.Field("userId", "用户 ID", "text", false), c.Field("host", "目标域名", "text", false), c.Field("ruleName", "规则", "text", false), c.Field("action", "处理方式", "status", false)}}}}, e
 }

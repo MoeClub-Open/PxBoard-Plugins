@@ -35,7 +35,7 @@ func (a *app) site(w http.ResponseWriter, r *http.Request) {
 	}
 	heading := p.Text(config, "heading")
 	if heading == "" {
-		heading = name + " 网络接入服务"
+		heading = name
 	}
 	title := p.Text(config, "seoTitle")
 	if title == "" {
@@ -100,6 +100,6 @@ var landingTemplate = template.Must(template.New("landing").Parse(`<div class="s
 <header class="storefront-header"><div class="storefront-header-inner"><a href="/" class="storefront-name" aria-label="{{.Name}} 首页"><div class="brand">{{if .LogoURL}}<img class="brand-logo" src="{{.LogoURL}}" alt="">{{end}}<span>{{.Name}}</span></div></a><nav aria-label="首页导航">{{if .Routes}}<a class="storefront-nav-link" href="#routes">线路介绍</a>{{end}}{{if .Features}}<a class="storefront-nav-link" href="#features">功能特性</a>{{end}}</nav></div></header>
 <main id="storefront-main" class="storefront-main" tabindex="-1"><div class="storefront-container storefront-hero-grid{{if .Routes}} has-routes{{end}}">
 <section class="storefront-hero" aria-labelledby="storefront-heading"><h1 id="storefront-heading">{{.Heading}}</h1>{{if .Introduction}}<p class="storefront-intro-text">{{.Introduction}}</p>{{end}}<div class="storefront-actions">{{if .RegistrationOpen}}<a class="storefront-action storefront-action-primary" href="/register">注册账户</a><a class="storefront-action storefront-action-secondary" href="/login">已有账户？登录</a>{{else}}<a class="storefront-action storefront-action-primary" href="/login">登录账户</a>{{end}}</div></section>
-{{if .Routes}}<section id="routes" class="storefront-network" aria-labelledby="storefront-routes-heading"><div class="storefront-network-heading"><h2 id="storefront-routes-heading">线路与网络</h2></div><div class="storefront-routes-grid{{if eq (len .Routes) 1}} single-route{{end}}">{{range .Routes}}<article class="storefront-route"><h3>{{.Title}}</h3>{{if .Region}}<p class="storefront-route-region">{{.Region}}</p>{{end}}{{if .Description}}<p class="storefront-route-description">{{.Description}}</p>{{end}}</article>{{end}}</div></section>{{end}}</div>
+{{if .Routes}}<section id="routes" class="storefront-network" aria-labelledby="storefront-routes-heading"><div class="storefront-network-heading"><h2 id="storefront-routes-heading">线路介绍</h2></div><div class="storefront-routes-grid{{if eq (len .Routes) 1}} single-route{{end}}">{{range .Routes}}<article class="storefront-route"><h3>{{.Title}}</h3>{{if .Region}}<p class="storefront-route-region">{{.Region}}</p>{{end}}{{if .Description}}<p class="storefront-route-description">{{.Description}}</p>{{end}}</article>{{end}}</div></section>{{end}}</div>
 {{if .Features}}<section id="features" class="storefront-features" aria-labelledby="storefront-features-heading"><div class="storefront-container"><h2 id="storefront-features-heading">功能特性</h2><div class="storefront-features-grid">{{range .Features}}<article class="storefront-feature"><div><h3>{{.Title}}</h3>{{if .Description}}<p>{{.Description}}</p>{{end}}</div></article>{{end}}</div></div></section>{{end}}</main>
 <footer class="storefront-footer"><div class="storefront-footer-inner"><span>© {{.Name}}</span>{{if .Footer}}<p>{{.Footer}}</p>{{end}}</div></footer></div>`))

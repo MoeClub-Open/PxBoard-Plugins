@@ -10,7 +10,7 @@ import (
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
 )
 
-const defaultIntroduction = "提供加密网络接入，按访问需求选择线路，并在账户中集中管理订阅。"
+const defaultIntroduction = ""
 
 type routeEntry struct {
 	Title       string `json:"title"`
@@ -24,20 +24,7 @@ type featureEntry struct {
 }
 
 func defaultFeatures() []featureEntry {
-	return []featureEntry{
-		{
-			Title:       "导入订阅即可连接",
-			Description: "将订阅地址导入兼容客户端，在电脑、手机和路由器上使用。",
-		},
-		{
-			Title:       "按设备管理订阅",
-			Description: "为不同设备创建独立链接，按需绑定客户端或重置链接。",
-		},
-		{
-			Title:       "套餐与用量随时查看",
-			Description: "在账户中查看流量用量、套餐有效期与订阅信息。",
-		},
-	}
+	return []featureEntry{}
 }
 
 func parseRoutes(raw any) ([]routeEntry, bool) {

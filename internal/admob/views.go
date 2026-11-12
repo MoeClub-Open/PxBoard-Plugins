@@ -27,6 +27,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		{Key: "tokenTtlSeconds", Label: "令牌有效期（秒）", Type: "number", Default: 900},
 		{Key: "callbackMaxAgeSeconds", Label: "回调最大时间偏移（秒）", Type: "number", Default: 3600},
 		{Key: "ssvSecret", Label: "SSV 签名密钥（留空自动生成）", Type: "text"},
+		{Key: "callbackPath", Label: "SSV 回调地址", Type: "copy", ReadOnly: true},
 	}
 	columns := []p.Field{
 		c.Field("planEnabled", "套餐激励", "boolean", false),
@@ -34,6 +35,7 @@ func (a *app) view(r *http.Request) (p.View, error) {
 		c.Field("planQuotaGiB", "赠送流量（GB）", "number", false),
 		c.Field("pointsEnabled", "余额激励", "boolean", false),
 		c.Field("pointsAmount", "每次奖励余额", "money", false),
+		{Key: "callbackPath", Label: "SSV 回调地址", Type: "copy", ReadOnly: true},
 	}
 	settingsRes := p.Resource{
 		Key:       "settings",
@@ -62,7 +64,6 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	}
 	return p.View{
 		Title:     "激励广告",
-		Notice:    "AdMob 控制台服务端验证（SSV）回调路径：/api/v1/extensions/admob/ssv；客户端广告单元与开关在客户端构建参数中配置。",
 		Resources: []p.Resource{settingsRes, logsRes},
 	}, nil
 }

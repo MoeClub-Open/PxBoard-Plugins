@@ -101,6 +101,7 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
+		cfg["callbackPath"] = "/api/v1/extensions/admob/ssv"
 		p.JSON(w, []p.Record{cfg})
 		return
 	}
@@ -109,6 +110,8 @@ func (a *app) settings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	delete(b, "id")
+	delete(b, "callbackPath")
+	delete(cfg, "callbackPath")
 	for k, v := range b {
 		cfg[k] = v
 	}

@@ -282,7 +282,6 @@ func (a *app) statusView(r *http.Request) (p.View, error) {
 		}
 		online := onlineServerCount(machines, now)
 		columns := []p.Field{
-			c.Field("number", "编号", "number", false),
 			c.Field("name", "服务器", "text", false),
 		}
 		if hasRegion {
