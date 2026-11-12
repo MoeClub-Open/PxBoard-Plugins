@@ -1,6 +1,6 @@
 # 订阅链接
 
-完整客户端配置、默认分流、模板编辑、预览和旧站转换见[订阅模板](subscription-templates.md)。格式支持 `aerion`（也接受 `xbclient`）、`clash`（也接受 `mihomo`、`clashmeta`、`meta`）、`sing-box`（也接受 `singbox`）和 `uri`。
+完整客户端配置、默认分流、模板编辑、预览和旧站转换见[订阅模板](subscription-templates.md)。格式支持 `aerion`（也接受 `xbclient`、`neto`）、`clash`（也接受 `mihomo`、`clashmeta`、`meta`）、`sing-box`（也接受 `singbox`）和 `uri`。
 
 用户可在“我的订阅”创建多条独立链接，分别命名、复制、重置或删除。重置后旧地址立即失效，同时解除该链接的客户端绑定；删除只影响这一条链接。原有订阅链接保持有效。通用地址根据客户端选择格式，普通浏览器默认得到 Mihomo 配置；也可使用 `format=clash`、`format=sing-box` 或 `format=uri` 指定格式。
 
@@ -18,10 +18,10 @@
 
 Web 前台与原生客户端统一使用核心会话调用 `POST /rpc/v1/subscriptions/client.profile`（也可放入 `POST /rpc/v1/$batch` 与账户、插件、钱包信息合并请求）。传入可选 `knownRevision` 时，配置未变化直接返回 `unchanged: true`；完整响应包含 `revision`、`blockReason`（`""`、`no_plan`、`expired`、`traffic_exceeded`、`suspended`）、`account`、`nodes`、`routing`、`links` 与 `settings`。接口要求登录，始终返回 HTTP 200 且只包含当前账号有权使用的节点；即使套餐到期或暂无节点，账户资料与权益状态也会正常返回。
 
-它不创建公开订阅令牌，不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录协议见主项目 `docs/native-clients.md`。Aerion 输出在保留生效 Mihomo 分流与协议转换的同时，会自动移除二进制 `.mrs` 等外部 `rule-providers` 并清理悬空 `RULE-SET` 引用（将 `cn-domain` 规则集转换为内置 `DOMAIN-SUFFIX,cn` 规则），避免原生客户端同步中断。
+当用户已具备有效访问权益且名下尚无任何订阅链接时，`client.profile` 会自动初始化一条默认订阅链接并返回在 `links` 中；它不触发首次客户端绑定，也不改变已有链接的人机验证状态。公开链接继续使用前述验证和绑定规则。客户端身份由核心会话保护；登录协议见主项目 `docs/native-clients.md`。Aerion 输出在保留生效 Mihomo 分流与协议转换的同时，会自动移除二进制 `.mrs` 等外部 `rule-providers` 并清理悬空 `RULE-SET` 引用（将 `cn-domain` 规则集转换为内置 `DOMAIN-SUFFIX,cn` 规则），避免原生客户端同步中断。
 
 ## Aerion 与 Mihomo 分离
 
-XBClient 使用 `format=aerion`，公开链接也接受 `flag=aerion`，未指定格式时可由 Aerion/XBClient 的 User-Agent 自动选择。Aerion 独立控制协议支持，复用现有 YAML 模板和标准协议字段构造；Flux 仅通过这个适配器输出。显式 `format=clash` 或 `flag=meta` 始终选择普通 Mihomo，声明 `types=flux` 或 Flux 能力头也不会将自定义协议混入其中。
+XBClient 与 Neto 使用 `format=aerion`（或 `format=neto`），公开链接也接受 `flag=aerion` / `flag=neto`，未指定格式时可由 Aerion / XBClient / Neto 的 User-Agent 自动选择。Aerion 独立控制协议支持，复用现有 YAML 模板和标准协议字段构造；Flux 仅通过这个适配器输出。显式 `format=clash` 或 `flag=meta` 始终选择普通 Mihomo，声明 `types=flux` 或 Flux 能力头也不会将自定义协议混入其中。
 
 `types` 中明确列出的协议优先于能力头，排除 Flux 时仍会过滤；`types=all` 使用所选适配器的协议范围。被过滤的协议通过 `X-PxBoard-Skipped-Protocols` 返回。模板仍在现有 Mihomo YAML 模板编辑器中统一维护，无需复制规则、代理组或模板记录。

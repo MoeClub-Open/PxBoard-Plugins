@@ -6,6 +6,7 @@ import (
 	c "github.com/MoeClub-Open/PxBoard-Plugins/internal/common"
 	sc "github.com/MoeClub-Open/PxBoard-Plugins/internal/subscriptionconfig"
 	p "github.com/MoeClub-Open/PxBoard/pkg/plugin"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -73,7 +74,15 @@ func (a *app) exportAccount(w http.ResponseWriter, r *http.Request, link p.Recor
 		}
 	}
 
-	info := fmt.Sprintf("upload=0; download=%.0f; total=%.0f", p.Number(account, "usedGiB")*1073741824, p.Number(account, "quotaGiB")*1073741824)
+	usedBytes := int64(math.Round(p.Number(account, "usedBytes")))
+	if usedBytes == 0 && p.Number(account, "usedGiB") > 0 {
+		usedBytes = int64(math.Round(p.Number(account, "usedGiB") * 1073741824))
+	}
+	quotaBytes := int64(math.Round(p.Number(account, "quotaGiB") * 1073741824))
+	info := fmt.Sprintf("upload=0; download=%d", usedBytes)
+	if !p.Bool(account, "unlimited") || quotaBytes > 0 {
+		info += fmt.Sprintf("; total=%d", quotaBytes)
+	}
 	if expires, e := time.Parse(time.RFC3339, p.Text(account, "expiresAt")); e == nil {
 		info += fmt.Sprintf("; expire=%d", expires.Unix())
 	}

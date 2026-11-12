@@ -1,0 +1,35 @@
+{
+  "id": "admob",
+  "apiVersion": "1.0",
+  "minCoreVersion": "1!0.0.1",
+  "versionEpoch": 1,
+  "version": "0.0.1",
+  "name": "激励广告",
+  "description": "Google AdMob 激励广告 SSV 签名校验与套餐、余额发奖",
+  "category": "商业",
+  "author": "PxBoard",
+  "dependencies": {
+    "access": ">=1!0.0.1"
+  },
+  "permissions": [
+    "storage:own",
+    "users:read",
+    "call:access",
+    "call:commerce"
+  ],
+  "publicPaths": [
+    "/ssv"
+  ],
+  "pages": [
+    {
+      "id": "admob",
+      "title": "激励广告",
+      "icon": "gift",
+      "group": "运营",
+      "surface": "admin",
+      "roles": [
+        "admin"
+      ]
+    }
+  ]
+}

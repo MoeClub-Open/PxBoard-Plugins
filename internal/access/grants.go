@@ -17,7 +17,7 @@ func addMonths(value time.Time, months int) time.Time {
 }
 
 func (a *app) grant(w http.ResponseWriter, r *http.Request) {
-	if !c.Require(w, r, "commerce", "redeem") {
+	if !c.Require(w, r, "commerce", "redeem", "admob") {
 		return
 	}
 	var b p.Record

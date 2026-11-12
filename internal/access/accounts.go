@@ -111,7 +111,7 @@ func clientAccount(row p.Record) p.Record {
 }
 
 func (a *app) userAccount(w http.ResponseWriter, r *http.Request) {
-	if !p.Admin(r) && !p.Service(r, "commerce") && !p.Service(r, "nodes") && !p.Service(r, "redeem") && !p.Service(r, "subscriptions") {
+	if !p.Admin(r) && !p.Service(r, "commerce") && !p.Service(r, "nodes") && !p.Service(r, "redeem") && !p.Service(r, "subscriptions") && !p.Service(r, "admob") {
 		p.Fail(w, 403, "无权读取账户权益")
 		return
 	}

@@ -50,15 +50,15 @@ func supportsFlux(r *http.Request) bool {
 	if hasExplicitHeader {
 		return false
 	}
-	if format := strings.ToLower(r.URL.Query().Get("format")); format == "aerion" || format == "xbclient" {
+	if format := strings.ToLower(r.URL.Query().Get("format")); format == "aerion" || format == "xbclient" || format == "neto" {
 		return true
 	}
 	flag := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("flag")))
-	if strings.Contains(flag, "aerion") || strings.Contains(flag, "xbclient") {
+	if strings.Contains(flag, "aerion") || strings.Contains(flag, "xbclient") || strings.Contains(flag, "neto") {
 		return true
 	}
 	ua := strings.ToLower(r.UserAgent())
-	return strings.Contains(ua, "aerion") || strings.Contains(ua, "xbclient")
+	return strings.Contains(ua, "aerion") || strings.Contains(ua, "xbclient") || strings.Contains(ua, "neto")
 }
 
 func fluxFirstText(m p.Record, keys ...string) string {

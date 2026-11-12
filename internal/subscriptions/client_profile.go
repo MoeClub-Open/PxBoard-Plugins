@@ -43,6 +43,23 @@ func (a *app) clientProfile(w http.ResponseWriter, r *http.Request) {
 	if c.Err(w, err) {
 		return
 	}
+	if blockReason == "" && len(account) > 0 && len(links) == 0 {
+		defaultLink := p.Record{
+			"id":            "default-" + subject.ID,
+			"userId":        subject.ID,
+			"name":          "默认订阅",
+			"bindUserAgent": false,
+			"token":         p.ID() + p.ID(),
+			"createdAt":     c.Now(),
+		}
+		if c.Err(w, a.C.Put("links", defaultLink)) {
+			return
+		}
+		links, err = a.userLinksSummary(subject.ID, subject.Email)
+		if c.Err(w, err) {
+			return
+		}
+	}
 	policySettings, err := a.templateSettings()
 	if c.Err(w, err) {
 		return

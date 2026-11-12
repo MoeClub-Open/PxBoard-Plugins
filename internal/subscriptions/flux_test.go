@@ -91,6 +91,17 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 		t.Fatal("Aerion User-Agent should receive flux")
 	}
 
+	netoUaReq := httptest.NewRequest("GET", "/s/token", nil)
+	netoUaReq.Header.Set("User-Agent", "Neto/0.1.0")
+	if subscriptionFormat(netoUaReq) != "aerion" || !supportedFormat(node, subscriptionFormat(netoUaReq), netoUaReq) {
+		t.Fatal("Neto User-Agent should resolve to aerion format and receive flux")
+	}
+
+	netoQueryReq := httptest.NewRequest("GET", "/s/token?format=neto", nil)
+	if subscriptionFormat(netoQueryReq) != "aerion" || !supportedFormat(node, subscriptionFormat(netoQueryReq), netoQueryReq) {
+		t.Fatal("?format=neto should resolve to aerion format and receive flux")
+	}
+
 	legacyXbReq := httptest.NewRequest("GET", "/s/token?flag=clash&types=anytls,hysteria,trojan,vless,vmess,mieru,sudoku", nil)
 	legacyXbReq.Header.Set("User-Agent", "Aerion")
 	if supportedFormat(node, "clash", legacyXbReq) {

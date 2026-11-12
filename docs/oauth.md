@@ -98,9 +98,10 @@ unset PX_OAUTH_ADMIN_TOKEN
 | 过程 / 回调 | 权限及用途 |
 | --- | --- |
 | `providers.list` | 公开的已启用服务名称、类型；`allowRegistration` 反映服务开关与全局注册政策的组合结果 |
-| `authorize` | 发起登录；`purpose=bind` 时需要用户会话；参数为 `providerId/purpose/proof/redirectPath`，可选 `referral` |
+| `authorize` | 发起登录或绑定；`purpose=bind` 时需要用户会话，传入 `client=native` 可开启无 Cookie 的原生客户端绑定轮询并返回 `id/expiresAt/intervalSeconds` |
 | `GET /api/v1/extensions/oauth/callback/{provider}` | 外部提供方浏览器回调，仅处理服务端已保存的一次性授权状态 |
 | `completeBinding` | 当前用户以 `ticket/proof` 确认绑定 |
+| `bindExchange` | 原生客户端携带会话轮询 `id/proof` 完成绑定，返回 `status = "pending"` 或 `"bound"` |
 | `registration` | 以待注册 `ticket/proof` 查询服务名称与到期时间，不返回提供方邮箱 |
 | `completeRegistration` | 以 `ticket/proof/email/password` 完成新账号注册，返回核心登录凭证 |
 | `bindings.list` | 当前用户的绑定列表，含 `requiresPassword` |

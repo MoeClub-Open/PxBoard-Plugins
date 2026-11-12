@@ -13,6 +13,7 @@
 | commerce | [套餐、订单、余额、价格优惠](docs/commerce.md) |
 | affiliate | [推广、佣金与提现](docs/affiliate.md) |
 | payments | Stripe 与易支付 |
+| admob | [Google AdMob 激励广告 SSV 验签与套餐、余额发奖](docs/admob.md) |
 | audit | 流量审计、阻断与账户暂停 |
 | support | [工单、公告和文档](docs/support.md) |
 | notifications | [独立邮件投递和密码找回](docs/notifications.md) |

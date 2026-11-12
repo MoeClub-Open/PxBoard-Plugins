@@ -51,7 +51,7 @@ func (a *app) internalOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) internalCapabilities(w http.ResponseWriter, r *http.Request) {
-	if c.Require(w, r, "affiliate", "redeem") {
+	if c.Require(w, r, "affiliate", "redeem", "admob") {
 		p.JSON(w, p.Record{"walletCredits": true})
 	}
 }
@@ -67,7 +67,7 @@ func (a *app) internalPurchaseHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) internalCredit(w http.ResponseWriter, r *http.Request) {
-	if !p.Service(r, "affiliate") && !p.Service(r, "redeem") {
+	if !p.Service(r, "affiliate") && !p.Service(r, "redeem") && !p.Service(r, "admob") {
 		p.Fail(w, 403, "无权写入钱包")
 		return
 	}
