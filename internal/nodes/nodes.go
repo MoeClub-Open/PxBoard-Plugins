@@ -25,8 +25,7 @@ func New() http.Handler {
 	a.Mux.HandleFunc("POST /groups", a.groups)
 	a.Mux.HandleFunc("PATCH /groups/{id}", a.groups)
 	a.Mux.HandleFunc("GET /groups/options", a.groupOptions)
-	res := resource()
-	a.CRUD(res, a.normalize)
+	a.nodesAPI()
 	a.View("nodes", a.view)
 	a.Summary(func(r *http.Request) ([]p.Metric, error) {
 		if !p.Admin(r) {
@@ -43,17 +42,99 @@ func New() http.Handler {
 			{Label: "主节点", Value: len(primaryNodes(rows))},
 		}, e
 	})
-	a.Mux.HandleFunc("POST /nodes/{id}/rotate", a.rotate)
-	a.Mux.HandleFunc("POST /agent/sync", a.sync)
 	a.Mux.HandleFunc("GET /internal/nodes", a.internal)
 	return a
 }
+
+func (a *app) nodesAPI() {
+	a.Mux.HandleFunc("GET /nodes", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Require(w, r) {
+			return
+		}
+		rows, e := a.C.List("nodes")
+		if c.Err(w, e) {
+			return
+		}
+		out := make([]p.Record, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, materializeFluxNodeForView(row))
+		}
+		p.JSON(w, out)
+	})
+	a.Mux.HandleFunc("POST /nodes", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Require(w, r) {
+			return
+		}
+		var b p.Record
+		if c.Err(w, p.Decode(r, &b)) {
+			return
+		}
+		delete(b, "id")
+		if c.Err(w, a.normalize(r, b, nil)) {
+			return
+		}
+		cleanRecordNilKeys(b)
+		b["createdAt"] = c.Now()
+		if !c.Err(w, a.C.Put("nodes", b)) {
+			p.JSON(w, b)
+		}
+	})
+	a.Mux.HandleFunc("PATCH /nodes/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Require(w, r) {
+			return
+		}
+		old, e := a.Find("nodes", r.PathValue("id"))
+		if c.Err(w, e) {
+			return
+		}
+		var b p.Record
+		if c.Err(w, p.Decode(r, &b)) {
+			return
+		}
+		b["id"] = old["id"]
+		if c.Err(w, a.normalize(r, b, old)) {
+			return
+		}
+		for k, v := range b {
+			if v == nil {
+				delete(old, k)
+			} else {
+				old[k] = v
+			}
+		}
+		if !c.Err(w, a.C.Put("nodes", old)) {
+			p.JSON(w, old)
+		}
+	})
+	a.Mux.HandleFunc("DELETE /nodes/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !c.Require(w, r) {
+			return
+		}
+		if !c.Err(w, a.C.Delete("nodes", r.PathValue("id"))) {
+			p.JSON(w, true)
+		}
+	})
+}
+
+func cleanRecordNilKeys(b p.Record) {
+	for k, v := range b {
+		if v == nil {
+			delete(b, k)
+		}
+	}
+}
+
 func (a *app) normalize(r *http.Request, b, old p.Record) error {
+	_, hostProvided := b["host"]
+	_, portProvided := b["port"]
 	transportChanged := b["transport"] != nil
 	_, certificatePatched := b["certConfig"]
 	mergeNodeSettings(b, old)
 	certificateChanged := certificatePatched && !reflect.DeepEqual(b["certConfig"], old["certConfig"])
 	c.Defaults(b, old, old)
+	if b["certConfig"] == nil && (p.Text(b, "certPath") != "" || p.Text(b, "keyPath") != "") {
+		b["certConfig"] = map[string]any{"mode": "file", "cert_path": p.Text(b, "certPath"), "key_path": p.Text(b, "keyPath")}
+	}
 	if old == nil {
 		number, e := a.nextNumber("nodes", "wireId")
 		if e != nil {
@@ -64,42 +145,48 @@ func (a *app) normalize(r *http.Request, b, old p.Record) error {
 		b["wireId"] = old["wireId"]
 	}
 	protocol := p.Text(b, "protocol")
-	tls := protocol != "mieru" && protocol != "shadowsocks" && protocol != "sudoku"
-	c.Defaults(b, old, p.Record{"engine": "noders", "protocol": "anytls", "port": 443.0, "trafficRate": 1.0, "enabled": true, "visible": true, "tls": tls, "groups": "default", "agentToken": p.ID() + p.ID()})
-	if e := c.Validate(b, "name", "host", "engine", "protocol"); e != nil {
+	tls := protocol != "mieru" && protocol != "shadowsocks" && protocol != "sudoku" && protocol != "flux"
+	c.Defaults(b, old, p.Record{"protocol": "anytls", "port": 443.0, "trafficRate": 1.0, "enabled": true, "visible": true, "tls": tls, "groups": "default"})
+	protocol = p.Text(b, "protocol")
+	if e := c.Validate(b, "name", "protocol"); e != nil {
 		return e
 	}
-	if !c.Allowed(p.Text(b, "engine"), "xray", "sing-box", "noders") || !c.Allowed(p.Text(b, "protocol"), "vless", "vmess", "trojan", "shadowsocks", "hysteria2", "anytls", "tuic", "mieru", "sudoku", "naive", "flux") {
-		return fmt.Errorf("内核或协议无效")
+	if !c.Allowed(protocol, "vless", "vmess", "trojan", "shadowsocks", "hysteria2", "anytls", "tuic", "mieru", "sudoku", "naive", "flux") {
+		return fmt.Errorf("协议无效")
 	}
-	if p.Text(b, "protocol") == "flux" && p.Text(b, "engine") != "noders" {
-		return fmt.Errorf("Flux 协议请选择 NodeRS")
-	}
-	if p.Text(b, "protocol") == "hysteria2" && p.Text(b, "engine") == "xray" {
-		return fmt.Errorf("Hysteria 2 请选择 sing-box")
-	}
-	if p.Text(b, "engine") == "xray" && !c.Allowed(p.Text(b, "protocol"), "vless", "vmess", "trojan", "shadowsocks") {
-		return fmt.Errorf("此协议请选择 NodeRS 或支持它的内核")
-	}
-	if p.Text(b, "engine") == "sing-box" && !c.Allowed(p.Text(b, "protocol"), "vless", "vmess", "trojan", "hysteria2") {
-		return fmt.Errorf("此协议请选择 NodeRS")
-	}
-	if p.Text(b, "engine") == "noders" && p.Number(b, "machineId") == 0 {
+	if p.Number(b, "machineId") == 0 {
 		return fmt.Errorf("请选择所属服务器")
 	}
-	if p.Text(b, "protocol") == "shadowsocks" && p.Text(b, "engine") == "sing-box" {
-		return fmt.Errorf("多用户 Shadowsocks 请选择 Xray")
+	if p.Number(b, "trafficRate") <= 0 {
+		return fmt.Errorf("流量倍率无效")
 	}
-	if p.Number(b, "port") <= 0 || p.Number(b, "port") > 65535 || p.Number(b, "trafficRate") <= 0 {
-		return fmt.Errorf("端口或流量倍率无效")
+	if protocol != "flux" {
+		if e := c.Validate(b, "host"); e != nil {
+			return e
+		}
+		if p.Number(b, "port") <= 0 || p.Number(b, "port") > 65535 {
+			return fmt.Errorf("连接端口无效")
+		}
 	}
-	return normalizeNodeConnection(b, old == nil, transportChanged, certificateChanged)
+	if err := normalizeNodeConnection(b, old == nil, transportChanged, certificateChanged, hostProvided, portProvided); err != nil {
+		return err
+	}
+	if e := c.Validate(b, "host"); e != nil {
+		return e
+	}
+	if p.Number(b, "port") <= 0 || p.Number(b, "port") > 65535 {
+		return fmt.Errorf("连接端口无效")
+	}
+	b["engine"] = nil
+	b["agentToken"] = nil
+	b["certPath"] = nil
+	b["keyPath"] = nil
+	return nil
 }
 func (a *app) view(r *http.Request) (p.View, error) {
 	if !p.Admin(r) {
 		return p.View{}, fmt.Errorf("仅管理员可管理节点")
 	}
-	res := resource()
 	machines, e := a.C.List("machines")
 	if e != nil {
 		return p.View{}, e
@@ -109,51 +196,13 @@ func (a *app) view(r *http.Request) (p.View, error) {
 	for _, machine := range machines {
 		serverOptions = append(serverOptions, p.Option{Label: fmt.Sprintf("%.0f · %s", p.Number(machine, "number"), p.Text(machine, "name")), Value: machine["number"]})
 	}
-	mf := c.Field("machineId", "所属服务器", "select", false)
-	mf.Required = true
-	mf.When = map[string][]string{"engine": {"noders"}}
-	mf.Options = serverOptions
-	res.Fields = append(res.Fields, mf)
-	for i := range res.Columns {
-		if res.Columns[i].Key == "machineId" {
-			res.Columns[i].Options = serverOptions
-		}
-	}
-	for i := range res.Fields {
-		switch res.Fields[i].Key {
-		case "port":
-			res.Fields[i].Default = 443
-		case "trafficRate":
-			res.Fields[i].Default = 1
-		case "engine":
-			res.Fields[i].Default = "noders"
-		case "protocol":
-			res.Fields[i].Default = "anytls"
-		case "groups":
-			res.Fields[i].Default = "default"
-		case "enabled", "tls":
-			res.Fields[i].Default = true
-		}
-	}
+	res := resource(serverOptions)
 	rows, e := a.C.List("nodes")
 	return p.View{
 		Title:     "节点管理",
 		Metrics:   []p.Metric{{Label: "主节点", Value: len(primaryNodes(rows))}, {Label: "连接地址", Value: len(rows)}, {Label: "关联服务器", Value: len(machines)}},
 		Resources: []p.Resource{res, groupResource()},
 	}, e
-}
-func (a *app) rotate(w http.ResponseWriter, r *http.Request) {
-	if !c.Require(w, r) {
-		return
-	}
-	row, e := a.Find("nodes", r.PathValue("id"))
-	if c.Err(w, e) {
-		return
-	}
-	row["agentToken"] = p.ID() + p.ID()
-	if !c.Err(w, a.C.Put("nodes", row)) {
-		p.JSON(w, p.Record{"token": row["agentToken"], "nodeId": row["id"]})
-	}
 }
 func (a *app) internal(w http.ResponseWriter, r *http.Request) {
 	if !c.Require(w, r, "subscriptions") {
@@ -190,7 +239,7 @@ func subscriptionNode(node, parent p.Record) p.Record {
 		result[key] = value
 	}
 	if parent != nil && !p.Bool(node, "enabled") {
-		for _, key := range []string{"engine", "protocol", "passwordMode", "tls", "tlsMode", "serverName", "tlsSettings", "realitySettings", "protocolOptions", "transport", "transportSettings"} {
+		for _, key := range []string{"protocol", "passwordMode", "tls", "tlsMode", "serverName", "tlsSettings", "realitySettings", "protocolOptions", "transport", "transportSettings"} {
 			result[key] = parent[key]
 		}
 		result["parentAccess"] = p.Record{"groups": parent["groups"], "minimumAccessLevel": parent["minimumAccessLevel"], "allowedAccountIds": parent["allowedAccountIds"]}
@@ -201,68 +250,4 @@ func subscriptionNode(node, parent p.Record) p.Record {
 func nodeVisible(row p.Record) bool {
 	visible, exists := row["visible"]
 	return !exists || visible != false
-}
-
-func (a *app) sync(w http.ResponseWriter, r *http.Request) {
-	var b struct {
-		NodeID      string     `json:"nodeId"`
-		ReportID    string     `json:"reportId"`
-		Usage       []p.Record `json:"usage"`
-		Connections []p.Record `json:"connections"`
-		Error       string     `json:"error"`
-	}
-	if c.Err(w, p.Decode(r, &b)) {
-		return
-	}
-	node, e := a.Find("nodes", b.NodeID)
-	if c.Err(w, e) {
-		return
-	}
-	if r.Header.Get("X-Node-Token") != p.Text(node, "agentToken") {
-		p.Fail(w, 401, "节点接入令牌无效")
-		return
-	}
-	if !p.Bool(node, "enabled") {
-		p.JSON(w, p.Record{"enabled": false})
-		return
-	}
-	if b.ReportID != "" {
-		done, e := a.hasReport(b.ReportID)
-		if c.Err(w, e) {
-			return
-		}
-		if !done {
-			if len(b.Usage) > 0 {
-				if e = a.C.Emit("traffic.reported", p.Record{"nodeId": b.NodeID, "usage": b.Usage, "rate": node["trafficRate"], "reportId": b.ReportID}); c.Err(w, e) {
-					return
-				}
-			}
-			if len(b.Connections) > 0 {
-				if e = a.C.Emit("traffic.observed", p.Record{"nodeId": b.NodeID, "reportId": b.ReportID, "connections": b.Connections}); c.Err(w, e) {
-					return
-				}
-			}
-			if c.Err(w, a.C.Put("reports", p.Record{"id": b.ReportID, "createdAt": c.Now()})) {
-				return
-			}
-		}
-	}
-	node["lastSeen"] = c.Now()
-	node["error"] = b.Error
-	if c.Err(w, a.C.Put("nodes", node)) {
-		return
-	}
-	var clients []p.Record
-	if c.Err(w, a.C.Call("access", "GET", "/internal/clients", nil, &clients)) {
-		return
-	}
-	filtered := []p.Record{}
-	for _, client := range clients {
-		if c.CanUse(client, node) {
-			filtered = append(filtered, client)
-		}
-	}
-	var rules []p.Record
-	_ = a.C.Call("audit", "GET", "/internal/rules", nil, &rules)
-	p.JSON(w, p.Record{"enabled": true, "node": node, "clients": filtered, "rules": rules})
 }

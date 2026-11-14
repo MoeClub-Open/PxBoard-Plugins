@@ -23,7 +23,7 @@ func TestFluxCapabilityGatingAndClashExport(t *testing.T) {
 			"rotationBytesMb":     96,
 			"clientFingerprint":   "chrome",
 			"reality": map[string]any{
-				"serverName": "www.microsoft.com",
+				"serverName": "huggingface.co",
 				"publicKey":  "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo",
 				"shortId":    "01234567",
 			},

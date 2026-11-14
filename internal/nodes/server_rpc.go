@@ -190,7 +190,7 @@ func (a *app) serverPull(w http.ResponseWriter, r *http.Request) {
 	machineNum := int64(p.Number(m, "number"))
 	machineNodes := []p.Record{}
 	for _, n := range rows {
-		if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") && p.Text(n, "engine") == "noders" {
+		if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") {
 			machineNodes = append(machineNodes, n)
 		}
 	}
@@ -306,7 +306,7 @@ func (a *app) serverTraffic(w http.ResponseWriter, r *http.Request) {
 	machineNum := int64(p.Number(m, "number"))
 	nodeByWire := map[int64]p.Record{}
 	for _, n := range nodeRows {
-		if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") && p.Text(n, "engine") == "noders" {
+		if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") {
 			nodeByWire[int64(p.Number(n, "wireId"))] = n
 		}
 	}
@@ -409,7 +409,7 @@ func (a *app) serverTelemetry(w http.ResponseWriter, r *http.Request) {
 		machineNum := int64(p.Number(m, "number"))
 		byWire := map[int64]p.Record{}
 		for _, n := range rows {
-			if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") && p.Text(n, "engine") == "noders" {
+			if int64(p.Number(n, "machineId")) == machineNum && p.Bool(n, "enabled") {
 				byWire[int64(p.Number(n, "wireId"))] = n
 			}
 		}

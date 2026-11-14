@@ -76,7 +76,7 @@ func (m *mapper) ssNodes() {
 			custom["cipher"] = first(custom, "encryption", "cipher")
 			delete(custom, "security")
 		}
-		base := p.Record{"name": row["name"], "host": host, "port": port, "serverPort": serverPort, "machineId": machine, "engine": "noders", "protocol": protocol, "tls": tls, "tlsMode": tlsMode, "serverName": serverName, "tlsSettings": p.Record{"allow_insecure": truth(custom, "allow_insecure")}, "transport": transport, "protocolOptions": custom, "transportSettings": settings, "certConfig": custom["cert_config"], "groups": m.group(group), "minimumAccessLevel": integer(row, "node_class"), "trafficRate": number(row, "traffic_rate"), "enabled": truth(row, "type"), "source": m.ref(row, table), "createdAt": m.S.ExportedAt}
+		base := p.Record{"name": row["name"], "host": host, "port": port, "serverPort": serverPort, "machineId": machine, "protocol": protocol, "tls": tls, "tlsMode": tlsMode, "serverName": serverName, "tlsSettings": p.Record{"allow_insecure": truth(custom, "allow_insecure")}, "transport": transport, "protocolOptions": custom, "transportSettings": settings, "certConfig": custom["cert_config"], "groups": m.group(group), "minimumAccessLevel": integer(row, "node_class"), "trafficRate": number(row, "traffic_rate"), "enabled": truth(row, "type"), "source": m.ref(row, table), "createdAt": m.S.ExportedAt}
 		if !cAllowedTransport(protocol, transport) {
 			m.fail("节点 %s 的传输方式 %s 暂不能由 NodeRS 接入", text(row, "name"), transport)
 		}

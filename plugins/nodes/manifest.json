@@ -1,8 +1,5 @@
 {
   "id": "nodes",
-  "publicProcedures": [
-    "agent.sync"
-  ],
   "apiVersion": "1.0",
   "name": "节点管理",
   "permissions": [

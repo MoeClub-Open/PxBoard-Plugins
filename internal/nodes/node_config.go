@@ -54,15 +54,14 @@ func mergeObject(old, patch map[string]any) map[string]any {
 	return out
 }
 
-func normalizeNodeConnection(b p.Record, creating, transportChanged, certificateChanged bool) error {
+func normalizeNodeConnection(b p.Record, creating, transportChanged, certificateChanged bool, endpointFlags ...bool) error {
+	hostProvided := len(endpointFlags) == 0 || endpointFlags[0]
+	portProvided := len(endpointFlags) < 2 || endpointFlags[1]
 	if b["serverPort"] == "" {
 		b["serverPort"] = nil
 	}
 	if port := p.Number(b, "serverPort"); port < 0 || port > 65535 {
 		return fmt.Errorf("节点监听端口无效")
-	}
-	if p.Text(b, "engine") != "noders" {
-		return nil
 	}
 	switch p.Text(b, "protocol") {
 	case "anytls":
@@ -96,7 +95,7 @@ func normalizeNodeConnection(b p.Record, creating, transportChanged, certificate
 			b["tlsMode"] = "none"
 		}
 	case "flux":
-		return normalizeFluxNode(b, creating, certificateChanged)
+		return normalizeFluxNode(b, creating, certificateChanged, hostProvided, portProvided)
 	}
 	if !p.Bool(b, "tls") || p.Text(b, "tlsMode") == "reality" {
 		return nil

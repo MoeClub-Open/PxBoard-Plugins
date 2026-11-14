@@ -1,6 +1,6 @@
 # PxBoard 官方插件
 
-独立于主项目发布的业务插件与节点代理。需要同级 `../PxBoard` 公开 SDK；本地模块通过 `replace` 引用。
+独立于主项目发布的业务插件与数据迁移工具。需要同级 `../PxBoard` 公开 SDK；本地模块通过 `replace` 引用。
 
 | 插件 | 内容 |
 | --- | --- |
@@ -31,7 +31,6 @@
 
 ```sh
 go build -o bin/nodes ./cmd/nodes
-go build -o bin/px-agent ./cmd/agent
 ```
 
 ## 安装与功能开关

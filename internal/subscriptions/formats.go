@@ -11,7 +11,7 @@ import (
 )
 
 func subscriptionPassword(account, n p.Record) string {
-	if p.Text(n, "engine") == "noders" && c.Allowed(p.Text(n, "protocol"), "anytls", "trojan", "tuic", "sudoku") {
+	if c.Allowed(p.Text(n, "protocol"), "anytls", "trojan", "tuic", "sudoku") {
 		if uuid := p.Text(account, "credential"); uuid != "" {
 			return uuid
 		}

@@ -85,10 +85,10 @@ func buildServerStatuses(machines, nodes, accounts []p.Record, mine bool, fields
 		if !p.Bool(node, "enabled") && parent != nil {
 			service = parent
 		}
-		if p.Text(service, "engine") != "noders" {
+		num := int64(p.Number(service, "machineId"))
+		if num <= 0 {
 			continue
 		}
-		num := int64(p.Number(service, "machineId"))
 		entriesByServer[num] = append(entriesByServer[num], node)
 		if p.Bool(node, "enabled") {
 			serviceByServer[num] = append(serviceByServer[num], node)

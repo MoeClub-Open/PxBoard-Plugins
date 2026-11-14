@@ -135,7 +135,7 @@ func fluxCleanSecurity(raw string) string {
 		return "reality"
 	case "tls":
 		return "tls"
-	case "obfs", "salamander":
+	case "obfs", "salamander", "aead", "aes":
 		return "obfs"
 	default:
 		return ""
@@ -272,7 +272,7 @@ func clashFluxProtocolOptions(n, options, out p.Record) {
 		default:
 			if nodePub != "" {
 				defaultSec = "reality"
-			} else if nodeObfs != "" {
+			} else if nodeObfs != "" || !p.Bool(n, "tls") {
 				defaultSec = "obfs"
 			} else {
 				defaultSec = "tls"

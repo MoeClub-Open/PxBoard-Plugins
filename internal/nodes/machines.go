@@ -136,7 +136,7 @@ func (a *app) machinesCRUD() {
 		}
 		counts := map[int64]int{}
 		for _, n := range primaryNodes(nodes) {
-			if p.Text(n, "engine") == "noders" {
+			if int64(p.Number(n, "machineId")) > 0 {
 				counts[int64(p.Number(n, "machineId"))]++
 			}
 		}
@@ -237,7 +237,7 @@ func (a *app) machinesCRUD() {
 			return
 		}
 		for _, n := range nodes {
-			if p.Text(n, "engine") == "noders" && int64(p.Number(n, "machineId")) == int64(p.Number(row, "number")) {
+			if int64(p.Number(n, "machineId")) == int64(p.Number(row, "number")) {
 				p.Fail(w, 400, "请先移除或迁移此服务器下的节点")
 				return
 			}

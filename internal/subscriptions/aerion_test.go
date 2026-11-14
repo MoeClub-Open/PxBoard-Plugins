@@ -111,7 +111,6 @@ func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T)
 	anytlsNoSNI := aerionClientNode(p.Record{
 		"name":     "JP Osaka Oracle",
 		"protocol": "anytls",
-		"engine":   "noders",
 		"host":     "osa.example.com",
 		"port":     443.0,
 		"tls":      true,
@@ -132,14 +131,14 @@ func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T)
 		"port":              443.0,
 		"tls":               true,
 		"tlsMode":           "reality",
-		"serverName":        "www.microsoft.com",
+		"serverName":        "huggingface.co",
 		"realitySettings":   map[string]any{"public_key": "pub-key", "short_id": "0102"},
 		"transport":         "httpupgrade",
 		"transportSettings": map[string]any{"path": "/up", "host": "cdn.example.com"},
 		"protocolOptions":   map[string]any{"flow": "xtls-rprx-vision", "client_fingerprint": "chrome"},
 	}, "secret", "uuid-1")
 	vlessTLS, ok := vlessReality["tls"].(p.Record)
-	if !ok || vlessTLS["enabled"] != true || vlessTLS["server_name"] != "www.microsoft.com" {
+	if !ok || vlessTLS["enabled"] != true || vlessTLS["server_name"] != "huggingface.co" {
 		t.Fatalf("unexpected VLESS tls object: %#v", vlessReality["tls"])
 	}
 	ro, ok := vlessReality["reality_opts"].(p.Record)
@@ -195,7 +194,6 @@ func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T)
 	sudokuNode := p.Record{
 		"name":            "Sudoku",
 		"protocol":        "sudoku",
-		"engine":          "noders",
 		"host":            "sudoku.example.com",
 		"port":            443.0,
 		"protocolOptions": map[string]any{"aead": "aes-128-gcm", "http_mask": true, "http_mask_mode": "ws", "multiplex": "on", "path_root": "edge"},
@@ -212,7 +210,6 @@ func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T)
 	naiveNode := p.Record{
 		"name":       "Naive",
 		"protocol":   "naive",
-		"engine":     "noders",
 		"host":       "naive.example.com",
 		"port":       443.0,
 		"tls":        true,
@@ -229,7 +226,7 @@ func TestAerionClientNodeEmitsObjectTLSAndNormalizedProtocolFields(t *testing.T)
 	}
 
 	migratedAcct := p.Record{"credential": "uuid-cred", "proxyPassword": "legacy-sspanel-pass"}
-	if got := subscriptionPassword(migratedAcct, p.Record{"engine": "noders", "protocol": "anytls"}); got != "uuid-cred" {
+	if got := subscriptionPassword(migratedAcct, p.Record{"protocol": "anytls"}); got != "uuid-cred" {
 		t.Fatalf("noders AnyTLS must use credential UUID, got %q", got)
 	}
 }

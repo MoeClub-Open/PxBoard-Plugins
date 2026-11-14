@@ -16,6 +16,7 @@ import (
 )
 
 const maxFluxExpandedPorts = 64
+const defaultRealityServerName = "huggingface.co"
 
 func normalizeChannelSlice(raw any) []any {
 	switch items := raw.(type) {
@@ -268,7 +269,7 @@ func normalizeFluxSecurity(raw string) (string, error) {
 		return "reality", nil
 	case "tls":
 		return "tls", nil
-	case "obfs", "salamander":
+	case "obfs", "salamander", "aead", "aes":
 		return "obfs", nil
 	default:
 		return "", fmt.Errorf("Flux 安全方式无效：%s", raw)
@@ -425,10 +426,78 @@ type fluxBindKey struct {
 	isUDP bool
 }
 
-func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
-	if p.Text(b, "engine") != "noders" {
-		return fmt.Errorf("Flux 协议请选择 NodeRS")
+func synthesizeLegacyFluxChannels(host string, connectPort, listenPort int) []any {
+	if connectPort <= 0 {
+		connectPort = listenPort
 	}
+	portStr := strconv.Itoa(connectPort)
+	ch := map[string]any{
+		"id":           "tcp-" + portStr,
+		"enabled":      true,
+		"transport":    "tcp",
+		"connectHost":  host,
+		"connectPorts": portStr,
+		"ipVersion":    "auto",
+		"role":         "primary",
+		"weight":       100,
+	}
+	if listenPort > 0 && listenPort != connectPort {
+		ch["listenPorts"] = strconv.Itoa(listenPort)
+	}
+	return []any{ch}
+}
+
+func materializeFluxNodeForView(row p.Record) p.Record {
+	if p.Text(row, "protocol") != "flux" {
+		return row
+	}
+	out := p.Record(cloneMap(map[string]any(row)))
+	options, _ := out["protocolOptions"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+	}
+	legacyHost := strings.TrimSpace(p.Text(out, "host"))
+	legacyPort := int(p.Number(out, "port"))
+	legacyListenPort := int(p.Number(out, "serverPort"))
+	channels := normalizeChannelSlice(options["channels"])
+	if len(channels) == 0 && legacyHost != "" && (legacyPort > 0 || legacyListenPort > 0) {
+		channels = synthesizeLegacyFluxChannels(legacyHost, legacyPort, legacyListenPort)
+		options["channels"] = channels
+		out["protocolOptions"] = options
+		return out
+	}
+	hasExplicitHost := false
+	anchorIdx := -1
+	for idx, item := range channels {
+		ch, ok := item.(map[string]any)
+		if !ok || !boolTrueDefault(ch, "enabled") {
+			continue
+		}
+		if anchorIdx < 0 || strings.ToLower(firstText(ch, "role")) != "backup" {
+			if anchorIdx < 0 {
+				anchorIdx = idx
+			} else if anchorCh, _ := channels[anchorIdx].(map[string]any); strings.ToLower(firstText(anchorCh, "role")) == "backup" {
+				anchorIdx = idx
+			}
+		}
+		if firstText(ch, "connectHost", "connect_host", "server", "host") != "" {
+			hasExplicitHost = true
+		}
+		if portSpecString(ch["connectPorts"]) == "" && portSpecString(ch["connect_ports"]) == "" && portSpecString(ch["ports"]) == "" && legacyPort > 0 {
+			ch["connectPorts"] = strconv.Itoa(legacyPort)
+		}
+	}
+	if !hasExplicitHost && anchorIdx >= 0 && legacyHost != "" {
+		if anchorCh, ok := channels[anchorIdx].(map[string]any); ok {
+			anchorCh["connectHost"] = legacyHost
+		}
+	}
+	options["channels"] = channels
+	out["protocolOptions"] = options
+	return out
+}
+
+func normalizeFluxNode(b p.Record, creating, certificateChanged, hostProvided, portProvided bool) error {
 	options, _ := b["protocolOptions"].(map[string]any)
 	if options == nil {
 		options = map[string]any{}
@@ -466,10 +535,13 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 
 	rawSec := firstText(options, "security", "defaultSecurity", "default_security")
 	if rawSec == "" {
-		if p.Text(b, "tlsMode") == "tls" {
-			rawSec = "tls"
-		} else {
+		switch p.Text(b, "tlsMode") {
+		case "reality":
 			rawSec = "reality"
+		case "tls":
+			rawSec = "tls"
+		default:
+			rawSec = "obfs"
 		}
 	}
 	defaultSec, err := normalizeFluxSecurity(rawSec)
@@ -484,95 +556,133 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 	delete(options, "client_fingerprint")
 	if fp == "" {
 		delete(options, "clientFingerprint")
+	} else if defaultSec == "obfs" {
+		hasTLSOrRealityCh := false
+		for _, item := range normalizeChannelSlice(options["channels"]) {
+			if ch, ok := item.(map[string]any); ok {
+				cs := strings.ToLower(strings.TrimSpace(firstText(ch, "security")))
+				if cs == "tls" || cs == "reality" {
+					hasTLSOrRealityCh = true
+					break
+				}
+			}
+		}
+		if hasTLSOrRealityCh {
+			options["clientFingerprint"] = fp
+		} else {
+			delete(options, "clientFingerprint")
+		}
 	} else {
 		if !c.Allowed(fp, "chrome", "firefox", "safari", "ios", "edge", "random", "android", "360", "qq") {
 			return fmt.Errorf("客户端指纹不支持：%s", fp)
 		}
 		options["clientFingerprint"] = fp
 	}
-
-	realityMap, _ := options["reality"].(map[string]any)
-	if realityMap == nil {
-		if rs, ok := b["realitySettings"].(map[string]any); ok && len(rs) > 0 {
-			realityMap = cloneMap(rs)
-		} else {
-			realityMap = map[string]any{}
+	if fp, hasFP := options["clientFingerprint"].(string); hasFP {
+		if !c.Allowed(fp, "chrome", "firefox", "safari", "ios", "edge", "random", "android", "360", "qq") {
+			return fmt.Errorf("客户端指纹不支持：%s", fp)
 		}
-	} else {
-		realityMap = cloneMap(realityMap)
 	}
 
-	nodePriv := firstText(realityMap, "privateKey", "private_key")
-	nodePub := firstText(realityMap, "publicKey", "public_key")
-	nodeShortID := firstText(realityMap, "shortId", "short_id")
-	nodeRealitySNI := firstText(realityMap, "serverName", "server_name")
-	nodeRealityDest := firstText(realityMap, "dest")
+	usesReality := defaultSec == "reality"
+	if !usesReality {
+		for _, item := range normalizeChannelSlice(options["channels"]) {
+			if ch, ok := item.(map[string]any); ok && strings.EqualFold(strings.TrimSpace(firstText(ch, "security")), "reality") {
+				usesReality = true
+				break
+			}
+		}
+	}
 
-	if err := validateFluxShortID(nodeShortID); err != nil {
-		return err
-	}
-	if err := validateRealityDest(nodeRealityDest); err != nil {
-		return err
-	}
-	if nodePriv != "" {
-		derivedPub, err := deriveRealityPublicKey(nodePriv)
-		if err != nil {
+	var nodePriv, nodePub, nodeShortID, nodeRealitySNI, nodeRealityDest string
+	if usesReality {
+		realityMap, _ := options["reality"].(map[string]any)
+		if realityMap == nil {
+			if rs, ok := b["realitySettings"].(map[string]any); ok && len(rs) > 0 {
+				realityMap = cloneMap(rs)
+			} else {
+				realityMap = map[string]any{}
+			}
+		} else {
+			realityMap = cloneMap(realityMap)
+		}
+
+		nodePriv = firstText(realityMap, "privateKey", "private_key")
+		nodePub = firstText(realityMap, "publicKey", "public_key")
+		nodeShortID = firstText(realityMap, "shortId", "short_id")
+		nodeRealitySNI = firstText(realityMap, "serverName", "server_name")
+		nodeRealityDest = firstText(realityMap, "dest")
+
+		if err := validateFluxShortID(nodeShortID); err != nil {
 			return err
 		}
-		nodePub = derivedPub
-	} else if defaultSec == "reality" {
-		genPriv, genPub, err := generateRealityKeypair()
-		if err != nil {
-			return fmt.Errorf("生成 REALITY 密钥失败：%w", err)
+		if err := validateRealityDest(nodeRealityDest); err != nil {
+			return err
 		}
-		nodePriv, nodePub = genPriv, genPub
-	}
-	if defaultSec == "reality" {
-		if nodeShortID == "" {
-			sid, err := generateFluxShortID()
+		if nodePriv != "" {
+			derivedPub, err := deriveRealityPublicKey(nodePriv)
 			if err != nil {
-				return fmt.Errorf("生成 REALITY Short ID 失败：%w", err)
+				return err
 			}
-			nodeShortID = sid
+			nodePub = derivedPub
+		} else if defaultSec == "reality" {
+			genPriv, genPub, err := generateRealityKeypair()
+			if err != nil {
+				return fmt.Errorf("生成 REALITY 密钥失败：%w", err)
+			}
+			nodePriv, nodePub = genPriv, genPub
 		}
-		if nodeRealitySNI == "" {
-			nodeRealitySNI = firstText(b, "serverName")
+		if defaultSec == "reality" {
+			if nodeShortID == "" {
+				sid, err := generateFluxShortID()
+				if err != nil {
+					return fmt.Errorf("生成 REALITY Short ID 失败：%w", err)
+				}
+				nodeShortID = sid
+			}
 			if nodeRealitySNI == "" {
-				nodeRealitySNI = "www.microsoft.com"
+				nodeRealitySNI = firstText(b, "serverName")
+				if nodeRealitySNI == "" {
+					nodeRealitySNI = defaultRealityServerName
+				}
 			}
 		}
-	}
 
-	cleanNodeReality := map[string]any{}
-	if nodeRealitySNI != "" {
-		cleanNodeReality["serverName"] = nodeRealitySNI
-	}
-	if nodeRealityDest != "" {
-		cleanNodeReality["dest"] = nodeRealityDest
-	}
-	if nodePriv != "" {
-		cleanNodeReality["privateKey"] = nodePriv
-	}
-	if nodePub != "" {
-		cleanNodeReality["publicKey"] = nodePub
-	}
-	if nodeShortID != "" {
-		cleanNodeReality["shortId"] = nodeShortID
-	}
-	if len(cleanNodeReality) > 0 {
-		options["reality"] = cleanNodeReality
-		rs := p.Record{
-			"server_name": nodeRealitySNI,
-			"private_key": nodePriv,
-			"public_key":  nodePub,
-			"short_id":    nodeShortID,
+		cleanNodeReality := map[string]any{}
+		if nodeRealitySNI != "" {
+			cleanNodeReality["serverName"] = nodeRealitySNI
 		}
 		if nodeRealityDest != "" {
-			rs["dest"] = nodeRealityDest
+			cleanNodeReality["dest"] = nodeRealityDest
 		}
-		b["realitySettings"] = rs
+		if nodePriv != "" {
+			cleanNodeReality["privateKey"] = nodePriv
+		}
+		if nodePub != "" {
+			cleanNodeReality["publicKey"] = nodePub
+		}
+		if nodeShortID != "" {
+			cleanNodeReality["shortId"] = nodeShortID
+		}
+		if len(cleanNodeReality) > 0 {
+			options["reality"] = cleanNodeReality
+			rs := p.Record{
+				"server_name": nodeRealitySNI,
+				"private_key": nodePriv,
+				"public_key":  nodePub,
+				"short_id":    nodeShortID,
+			}
+			if nodeRealityDest != "" {
+				rs["dest"] = nodeRealityDest
+			}
+			b["realitySettings"] = rs
+		} else {
+			delete(options, "reality")
+			b["realitySettings"] = nil
+		}
 	} else {
 		delete(options, "reality")
+		b["realitySettings"] = nil
 	}
 
 	nodeObfsKey := firstText(options, "obfsKey", "obfs_key")
@@ -597,17 +707,46 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 	if defaultNodePort <= 0 {
 		defaultNodePort = int(p.Number(b, "port"))
 	}
+	legacyConnectPort := int(p.Number(b, "port"))
+	legacyListenPort := int(p.Number(b, "serverPort"))
 	needsInheritedCert := defaultSec == "tls"
 
 	rawChannels := normalizeChannelSlice(options["channels"])
-	if len(rawChannels) == 0 {
-		if defaultNodePort <= 0 || defaultNodePort > 65535 {
-			return fmt.Errorf("Flux 节点监听端口无效")
+	if len(rawChannels) == 0 && (hostProvided || !creating) {
+		legacyHost := strings.TrimSpace(p.Text(b, "host"))
+		if legacyHost != "" && (legacyConnectPort > 0 || legacyListenPort > 0) {
+			rawChannels = synthesizeLegacyFluxChannels(legacyHost, legacyConnectPort, legacyListenPort)
 		}
-		delete(options, "channels")
+	}
+	if len(rawChannels) == 0 {
+		return fmt.Errorf("Flux 节点请至少配置一条启用的通道")
 	} else {
+		primaryHost := ""
+		anchorIdx := -1
+		for idx, item := range rawChannels {
+			ch, ok := item.(map[string]any)
+			if !ok || !boolTrueDefault(ch, "enabled") {
+				continue
+			}
+			isBackup := strings.ToLower(firstText(ch, "role")) == "backup" || strings.ToLower(firstText(ch, "role")) == "standby" || strings.ToLower(firstText(ch, "role")) == "failover"
+			if anchorIdx < 0 {
+				anchorIdx = idx
+			} else if anchorCh, _ := rawChannels[anchorIdx].(map[string]any); !isBackup && (strings.ToLower(firstText(anchorCh, "role")) == "backup" || strings.ToLower(firstText(anchorCh, "role")) == "standby" || strings.ToLower(firstText(anchorCh, "role")) == "failover") {
+				anchorIdx = idx
+			}
+			if h := firstText(ch, "connectHost", "connect_host", "server", "host"); h != "" {
+				if primaryHost == "" || (!isBackup && idx == anchorIdx) {
+					primaryHost = h
+				}
+			}
+		}
+		if primaryHost == "" && hostProvided {
+			primaryHost = strings.TrimSpace(p.Text(b, "host"))
+		}
+
 		normalizedChannels := make([]any, 0, len(rawChannels))
 		enabledCount := 0
+		primaryPort := 0
 		seenBindings := map[fluxBindKey]string{}
 		distinctServerPorts := 0
 
@@ -645,7 +784,11 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 			}
 			outCh["weight"] = weight
 
-			if connectHost := firstText(ch, "connectHost", "connect_host", "server", "host"); connectHost != "" {
+			connectHost := firstText(ch, "connectHost", "connect_host", "server", "host")
+			if connectHost == "" && idx == anchorIdx && primaryHost != "" {
+				connectHost = primaryHost
+			}
+			if connectHost != "" {
 				outCh["connectHost"] = connectHost
 			}
 
@@ -656,11 +799,21 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 			if connectPortsSpec == "" {
 				connectPortsSpec = portSpecString(ch["ports"])
 			}
+			if (connectPortsSpec == "" || connectPortsSpec == "0") && enabled && portProvided && legacyConnectPort > 0 {
+				connectPortsSpec = strconv.Itoa(legacyConnectPort)
+			}
+			var connectPorts []int
 			if connectPortsSpec != "" && connectPortsSpec != "0" {
-				if _, err := parseFluxPortSpec(connectPortsSpec, maxFluxExpandedPorts); err != nil {
+				connectPorts, err = parseFluxPortSpec(connectPortsSpec, maxFluxExpandedPorts)
+				if err != nil {
 					return fmt.Errorf("通道 %s 连接端口错误：%w", id, err)
 				}
 				outCh["connectPorts"] = connectPortsSpec
+			} else if enabled {
+				return fmt.Errorf("请填写通道 %s 的连接端口", id)
+			}
+			if enabled && len(connectPorts) > 0 && (idx == anchorIdx || primaryPort == 0) {
+				primaryPort = connectPorts[0]
 			}
 
 			ipVer := strings.ToLower(firstText(ch, "ipVersion", "ip_version"))
@@ -702,12 +855,19 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 				effectiveListenSpec = connectPortsSpec
 			}
 			var serverPorts []int
-			if effectiveListenSpec == "" || effectiveListenSpec == "0" {
-				if defaultNodePort <= 0 || defaultNodePort > 65535 {
-					return fmt.Errorf("通道 %s 未填写端口且节点默认端口无效", id)
+			if enabled {
+				if effectiveListenSpec == "" || effectiveListenSpec == "0" {
+					if defaultNodePort <= 0 || defaultNodePort > 65535 {
+						return fmt.Errorf("请填写通道 %s 的监听端口或连接端口", id)
+					}
+					serverPorts = []int{defaultNodePort}
+				} else {
+					serverPorts, err = parseFluxPortSpec(effectiveListenSpec, maxFluxExpandedPorts)
+					if err != nil {
+						return err
+					}
 				}
-				serverPorts = []int{defaultNodePort}
-			} else {
+			} else if effectiveListenSpec != "" && effectiveListenSpec != "0" {
 				serverPorts, err = parseFluxPortSpec(effectiveListenSpec, maxFluxExpandedPorts)
 				if err != nil {
 					return err
@@ -823,7 +983,7 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 					}
 				}
 				if chSNI == "" && chDest == "" && nodeRealitySNI == "" && p.Text(b, "serverName") == "" {
-					chSNI = "www.microsoft.com"
+					chSNI = defaultRealityServerName
 				}
 				if chSNI != "" {
 					outCh["sni"] = chSNI
@@ -951,7 +1111,16 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 		if enabledCount == 0 {
 			return fmt.Errorf("Flux 节点至少需要保留一条启用的通道")
 		}
+		if primaryHost == "" {
+			return fmt.Errorf("请至少在首条启用通道中填写连接地址")
+		}
+		if primaryPort <= 0 || primaryPort > 65535 {
+			return fmt.Errorf("Flux 主通道端口无效")
+		}
 		options["channels"] = normalizedChannels
+		b["host"] = primaryHost
+		b["port"] = float64(primaryPort)
+		b["serverPort"] = nil
 	}
 
 	b["protocolOptions"] = options
@@ -963,6 +1132,9 @@ func normalizeFluxNode(b p.Record, creating, certificateChanged bool) error {
 		b["tls"], b["tlsMode"] = true, "tls"
 	default:
 		b["tls"], b["tlsMode"] = false, "none"
+		if !needsInheritedCert && !usesReality {
+			b["serverName"] = nil
+		}
 	}
 
 	if needsInheritedCert {
@@ -985,7 +1157,7 @@ func fluxMachineSecurityAndOptions(n p.Record) (p.Record, map[string]any) {
 		case "tls":
 			defaultSec = "tls"
 		default:
-			defaultSec = "reality"
+			defaultSec = "obfs"
 		}
 	}
 	options["security"] = defaultSec

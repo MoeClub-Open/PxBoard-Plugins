@@ -169,7 +169,7 @@ func (m *mapper) v2Nodes() {
 		if row["show"] == nil {
 			visible = enabled
 		}
-		n := p.Record{"wireId": wireID, "machineId": machine, "name": row["name"], "host": host, "port": portValue, "serverPort": serverPort, "engine": "noders", "protocol": protocol, "tls": tlsMode > 0, "tlsMode": mode, "serverName": serverName, "tlsSettings": tlsSettings, "realitySettings": reality, "certConfig": certificate, "transport": transport, "transportSettings": networkSettings, "protocolOptions": settings, "groups": strings.Join(groups, ","), "trafficRate": number(row, "rate"), "enabled": enabled, "visible": visible, "source": m.ref(row, table), "createdAt": m.created(row, "created_at")}
+		n := p.Record{"wireId": wireID, "machineId": machine, "name": row["name"], "host": host, "port": portValue, "serverPort": serverPort, "protocol": protocol, "tls": tlsMode > 0, "tlsMode": mode, "serverName": serverName, "tlsSettings": tlsSettings, "realitySettings": reality, "certConfig": certificate, "transport": transport, "transportSettings": networkSettings, "protocolOptions": settings, "groups": strings.Join(groups, ","), "trafficRate": number(row, "rate"), "enabled": enabled, "visible": visible, "source": m.ref(row, table), "createdAt": m.created(row, "created_at")}
 		n["sort"] = integer(row, "sort")
 		if number(row, "rate") == 0 {
 			m.fail("节点 %s 的流量倍率为 0，请在源面板确认", text(row, "name"))
